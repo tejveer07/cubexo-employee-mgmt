@@ -1,9 +1,13 @@
-# build.spec — PyInstaller spec for employee-ops-system
+# build.spec — PyInstaller spec for employee-ops-system (single-file exe)
 # Build with:  pyinstaller build.spec
+# Output:      dist/employee-ops-system.exe
+#
+# Set CONSOLE = False for the end-user build (no console window; output goes to
+# ops-system.log next to the exe). Keep True while testing so errors are visible.
 
-import sys
-import os
 from pathlib import Path
+
+CONSOLE = False
 
 block_cipher = None
 APP_DIR = Path(SPECPATH) / "app"
@@ -13,10 +17,9 @@ a = Analysis(
     pathex=[SPECPATH],
     binaries=[],
     datas=[
-        # Include Jinja2 templates and static assets inside the bundle
+        # Jinja2 templates, static assets (incl. vendor/htmx + chart.js), and Alembic files
         (str(APP_DIR / "templates"), "app/templates"),
         (str(APP_DIR / "static"),    "app/static"),
-        # Include Alembic migrations so the app can run them at startup
         (str(Path(SPECPATH) / "alembic"), "alembic"),
         (str(Path(SPECPATH) / "alembic.ini"), "."),
     ],
@@ -27,10 +30,16 @@ a = Analysis(
         "alembic.script",
         "alembic.config",
         "aiofiles",
+        # uvicorn picks its loop/protocol implementations by name at runtime
+        "uvicorn.logging",
+        "uvicorn.loops.auto",
+        "uvicorn.protocols.http.auto",
+        "uvicorn.protocols.websockets.auto",
+        "uvicorn.lifespan.on",
     ],
     hookspath=[],
     runtime_hooks=[],
-    excludes=[],
+    excludes=["tkinter"],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -39,27 +48,21 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# Single file: binaries, zipfiles and datas are packed INTO the exe (no COLLECT step).
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
     [],
-    exclude_binaries=True,
     name="employee-ops-system",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    console=True,   # keep console window so errors are visible; set False for silent launch
+    upx=False,          # UPX-packed exes are a common antivirus false-positive
+    runtime_tmpdir=None,
+    console=CONSOLE,
+    disable_windowed_traceback=False,
     icon=None,
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name="employee-ops-system",
 )

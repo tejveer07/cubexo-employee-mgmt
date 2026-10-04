@@ -12,8 +12,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
-from sqlalchemy import inspect, text
+from sqlalchemy import create_engine, inspect
 
+from app import models
 from app.database import DB_PATH, engine
 from app.auth import require_login
 from app.templates_config import templates
@@ -26,6 +27,33 @@ EXPECTED_TABLES = {
     "tech_stacks", "employee_tech_stacks", "reviews",
     "org_settings", "salary_history", "project_income_history", "gst_rate_history",
 }
+
+
+def _schema_problems(db_file: Path) -> list[str]:
+    """Compare an uploaded SQLite file against the current models. Returns human-readable
+    problems. A table that is missing entirely is only a problem for the core tables
+    (new model tables get created after import); a column the models need but the file
+    lacks is always a problem, because queries would fail later."""
+    test_engine = create_engine(f"sqlite:///{db_file}", connect_args={"check_same_thread": False})
+    try:
+        inspector = inspect(test_engine)
+        found_tables = set(inspector.get_table_names())
+        problems = []
+
+        missing_core = EXPECTED_TABLES - found_tables
+        if missing_core:
+            problems.append(f"Missing tables: {', '.join(sorted(missing_core))}")
+
+        for table in models.Base.metadata.sorted_tables:
+            if table.name not in found_tables:
+                continue
+            file_cols = {c["name"] for c in inspector.get_columns(table.name)}
+            missing_cols = {c.name for c in table.columns} - file_cols
+            if missing_cols:
+                problems.append(f"{table.name} is missing columns: {', '.join(sorted(missing_cols))}")
+        return problems
+    finally:
+        test_engine.dispose()
 
 
 # ---------------------------------------------------------------------------
@@ -58,7 +86,7 @@ async def import_db(
     file: UploadFile = File(...),
     user: str = Depends(require_login),
 ):
-    if not file.filename.endswith(".db"):
+    if not (file.filename or "").endswith(".db"):
         return templates.TemplateResponse("db_import.html", {
             "request": request,
             "error": "Please upload a .db file.",
@@ -71,21 +99,12 @@ async def import_db(
         contents = await file.read()
         temp_path.write_bytes(contents)
 
-        # Schema sanity check — open the uploaded DB and verify tables
-        from sqlalchemy import create_engine as _ce
-        test_engine = _ce(f"sqlite:///{temp_path}", connect_args={"check_same_thread": False})
-        try:
-            inspector = inspect(test_engine)
-            found_tables = set(inspector.get_table_names())
-            missing = EXPECTED_TABLES - found_tables
-        finally:
-            test_engine.dispose()
-
-        if missing:
+        problems = _schema_problems(temp_path)
+        if problems:
             temp_path.unlink(missing_ok=True)
             return templates.TemplateResponse("db_import.html", {
                 "request": request,
-                "error": f"Schema check failed. Missing tables: {', '.join(sorted(missing))}",
+                "error": "Schema check failed. " + " ".join(problems),
                 "success": None,
             }, status_code=400)
 
@@ -99,6 +118,9 @@ async def import_db(
 
         # Swap
         shutil.move(str(temp_path), str(DB_PATH))
+
+        # Tables added in newer versions may not exist in an older export yet
+        models.Base.metadata.create_all(bind=engine)
 
         return templates.TemplateResponse("db_import.html", {
             "request": request,

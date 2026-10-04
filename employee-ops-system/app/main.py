@@ -10,9 +10,12 @@ Usage (packaged):
 """
 
 import argparse
+import logging
 import os
+import socket
 import sys
 import threading
+import time
 import webbrowser
 from contextlib import asynccontextmanager
 from datetime import date
@@ -25,9 +28,10 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.database import engine, DB_PATH, get_db, SessionLocal
 from app import models
-from app.auth import authenticate, login_user, logout_user, require_login
-from app.templates_config import templates
+from app.auth import authenticate, login_user, logout_user, require_login, LoginRequired
+from app.templates_config import templates, BASE_DIR
 from app.services.employees import sweep_exited_employees
+from app.services.bootstrap import ensure_defaults
 
 # ---------------------------------------------------------------------------
 # Create tables on first run (Alembic migrations are the authoritative path;
@@ -53,9 +57,22 @@ def _run_exit_sweep(today: date | None = None) -> None:
         db.close()
 
 
+def _run_first_run_defaults() -> None:
+    # Creates the admin account and starter tech stacks on an empty DB (no-op otherwise).
+    db = SessionLocal()
+    try:
+        ensure_defaults(db)
+    except Exception:
+        db.rollback()
+        logging.getLogger("ops.startup").exception("first-run defaults failed")
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _last_sweep
+    _run_first_run_defaults()
     _last_sweep = date.today()
     _run_exit_sweep(_last_sweep)
     yield
@@ -77,12 +94,17 @@ async def _daily_exit_sweep(request: Request, call_next):
         _run_exit_sweep(today)
     return await call_next(request)
 
+@app.exception_handler(LoginRequired)
+async def _redirect_to_login(request: Request, exc: LoginRequired):
+    return RedirectResponse("/login", status_code=302)
+
+
 # Session middleware (uses itsdangerous signed cookies)
 SECRET_KEY = os.environ.get("APP_SECRET_KEY", "change-me-in-production-please")
 app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, session_cookie="ops_session")
 
-# Static files
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Static files. BASE_DIR comes from templates_config (inside the app package) because
+# __file__ here is wrong when this module runs as the PyInstaller entry script.
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
 # ---------------------------------------------------------------------------
@@ -188,23 +210,58 @@ async def dashboard(
 # ---------------------------------------------------------------------------
 HOST = "127.0.0.1"
 PORT = 8767
+PORT_TRIES = 10  # if 8767 is taken (e.g. a second copy is open), use the next free port
 
 
-def _open_browser():
-    webbrowser.open(f"http://{HOST}:{PORT}")
+def _pick_port(start: int) -> int:
+    for port in range(start, start + PORT_TRIES):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind((HOST, port))
+                return port
+            except OSError:
+                continue
+    raise RuntimeError(f"No free port in {start}-{start + PORT_TRIES - 1}. Close other copies and try again.")
+
+
+def _open_browser_when_ready(port: int, timeout: float = 20.0) -> None:
+    """Open the browser only after the server accepts connections, so the first page
+    load never hits 'connection refused' on a slow PC."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((HOST, port), timeout=0.5):
+                webbrowser.open(f"http://{HOST}:{port}")
+                return
+        except OSError:
+            time.sleep(0.2)
+    logging.getLogger("ops.startup").error("Server did not start on port %s within %ss", port, timeout)
+
+
+def _setup_windowed_logging() -> None:
+    """A windowed (console=False) PyInstaller exe has sys.stdout/sys.stderr set to None,
+    and uvicorn's default logging crashes on that. Send output to ops-system.log next
+    to the database instead."""
+    if sys.stdout is not None and sys.stderr is not None:
+        return
+    log_file = open(DB_PATH.parent / "ops-system.log", "a", encoding="utf-8", buffering=1)
+    sys.stdout = sys.stderr = log_file
+    logging.basicConfig(stream=log_file, level=logging.INFO,
+                        format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 
 if __name__ == "__main__":
+    _setup_windowed_logging()
     parser = argparse.ArgumentParser()
     parser.add_argument("--dev", action="store_true", help="Run with hot-reload")
     args = parser.parse_args()
 
-    if not args.dev:
-        threading.Timer(1.0, _open_browser).start()
-
-    uvicorn.run(
-        "app.main:app",
-        host=HOST,
-        port=PORT,
-        reload=args.dev,
-    )
+    if args.dev:
+        uvicorn.run("app.main:app", host=HOST, port=PORT, reload=True)
+    else:
+        port = _pick_port(PORT)
+        threading.Thread(target=_open_browser_when_ready, args=(port,), daemon=True).start()
+        # When frozen by PyInstaller, "app.main:app" can't be re-imported by name (this
+        # file runs as __main__), so hand uvicorn the app object directly.
+        target = app if getattr(sys, "frozen", False) else "app.main:app"
+        uvicorn.run(target, host=HOST, port=port, reload=False)

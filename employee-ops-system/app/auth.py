@@ -56,10 +56,14 @@ def current_user(request: Request) -> str | None:
 # FastAPI dependency — redirects to /login if not authenticated
 # ---------------------------------------------------------------------------
 
+class LoginRequired(Exception):
+    """Raised by require_login; main.py turns it into a redirect to /login."""
+
+
 def require_login(request: Request) -> str:
     user = current_user(request)
     if not user:
-        raise HTTPException(status_code=302, headers={"Location": "/login"})
+        raise LoginRequired()
     return user
 
 

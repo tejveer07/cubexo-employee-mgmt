@@ -19,6 +19,13 @@ from app.services.notifications import load_smtp_config, notify_project_assignme
 router = APIRouter(prefix="/employees", tags=["employees"])
 
 
+def _optional_int(raw: str) -> int | None:
+    """Parse a query-string id from a dropdown. Empty or non-numeric input means
+    'no filter' instead of a 500 from int()."""
+    raw = raw.strip()
+    return int(raw) if raw.isdigit() else None
+
+
 # ---------------------------------------------------------------------------
 # List
 # ---------------------------------------------------------------------------
@@ -38,9 +45,9 @@ async def employee_list(
     db: Session = Depends(get_db),
 ):
     # Convert empty strings to None
-    team_id_int    = int(team_id)    if team_id.strip()    else None
-    project_id_int = int(project_id) if project_id.strip() else None
-    tech_id_int    = int(tech_id)    if tech_id.strip()    else None
+    team_id_int    = _optional_int(team_id)
+    project_id_int = _optional_int(project_id)
+    tech_id_int    = _optional_int(tech_id)
 
     query = db.query(models.Employee)
 
@@ -150,7 +157,7 @@ async def create_employee(
     db.add(emp)
     db.flush()  # get emp.id
 
-    for tid in tech_stack_ids:
+    for tid in set(tech_stack_ids):
         db.add(models.EmployeeTechStack(employee_id=emp.id, tech_stack_id=tid))
 
     if monthly_salary is not None:
@@ -294,7 +301,7 @@ async def update_employee(
 
     # Update tech stacks
     db.query(models.EmployeeTechStack).filter_by(employee_id=employee_id).delete()
-    for tid in tech_stack_ids:
+    for tid in set(tech_stack_ids):
         db.add(models.EmployeeTechStack(employee_id=employee_id, tech_stack_id=tid))
 
     db.commit()
@@ -340,11 +347,16 @@ async def reactivate_employee(
 @router.post("/{employee_id}/assign-team")
 async def assign_team(
     employee_id: int,
+    request: Request,
     team_id: int = Form(...),
     from_date: date = Form(...),
     user: str = Depends(require_login),
     db: Session = Depends(get_db),
 ):
+    if not db.get(models.Team, team_id):
+        request.session["_flash_error"] = "That team no longer exists."
+        return RedirectResponse(f"/employees/{employee_id}", status_code=302)
+
     # Close any open memberships first
     db.query(models.TeamMembership).filter_by(employee_id=employee_id, to_date=None).update({"to_date": from_date})
     db.add(models.TeamMembership(employee_id=employee_id, team_id=team_id, from_date=from_date))
@@ -378,6 +390,10 @@ async def assign_project(
     user: str = Depends(require_login),
     db: Session = Depends(get_db),
 ):
+    if not db.get(models.Project, project_id):
+        request.session["_flash_error"] = "That project no longer exists."
+        return RedirectResponse(f"/employees/{employee_id}", status_code=302)
+
     # Close any open project assignment first — an employee is on one project at a
     # time, so cost analysis attributes their whole salary to a single project.
     db.query(models.EmployeeProjectAssignment).filter_by(
