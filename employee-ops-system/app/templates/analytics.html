@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}Analytics{% endblock %}
+
+{% macro chartcard(title, cid, has, wide=False) -%}
+<div class="chart-card{% if wide %} chart-wide{% endif %}">
+  <h3>{{ title }}</h3>
+  {% if has %}
+  <div class="chart-box"><canvas id="{{ cid }}"></canvas></div>
+  {% else %}
+  <div class="chart-empty">No data yet</div>
+  {% endif %}
+</div>
+{%- endmacro %}
+
+{% block content %}
+
+<div class="page-header">
+  <h1>Analytics</h1>
+  <a href="/cost-analysis" class="btn btn-outline btn-sm">📊 Cost Analysis detail</a>
+</div>
+
+{% set c = charts %}
+{% set comp_has = c.composition.this_month.gross or c.composition.this_month.salary %}
+
+<div class="chart-section-title">People</div>
+<div class="chart-grid">
+  {{ chartcard("Headcount over time", "cv-headcount", c.headcount_trend, wide=True) }}
+  {{ chartcard("Joiners vs leavers per month", "cv-joiners", c.headcount_trend, wide=True) }}
+  {{ chartcard("Headcount by team", "cv-team", c.headcount_by.by_team) }}
+  {{ chartcard("Headcount by designation", "cv-desig", c.headcount_by.by_designation) }}
+  {{ chartcard("Headcount by tech stack", "cv-tech", c.headcount_by.by_tech_stack) }}
+  {{ chartcard("Project allocation", "cv-alloc", c.allocation.assigned or c.allocation.bench) }}
+  {{ chartcard("Headcount per project", "cv-proj-hc", c.allocation.per_project) }}
+  {{ chartcard("Reviews: appreciation vs escalation", "cv-reviews", c.reviews_trend, wide=True) }}
+</div>
+
+<div class="chart-section-title">Cost &amp; Profit</div>
+<div class="chart-grid">
+  {{ chartcard("Net income, salary cost &amp; gross margin over time", "cv-cost-trend", c.cost_trend, wide=True) }}
+  {{ chartcard("Per-project net income vs cost vs profit (this month)", "cv-pp", c.per_project_pl, wide=True) }}
+  <div class="chart-card">
+    <h3>This month — where gross income goes</h3>
+    {% if comp_has %}
+    <div class="chart-box"><canvas id="cv-comp-month"></canvas></div>
+    <p class="text-xs text-muted mt-1">Net profit / loss this month:
+      {{ '{:,.2f}'.format(c.composition.this_month.profit) }}</p>
+    {% else %}
+    <div class="chart-empty">No data yet</div>
+    {% endif %}
+  </div>
+  <div class="chart-card">
+    <h3>Lifetime — where gross income goes</h3>
+    {% if c.composition.lifetime.gross or c.composition.lifetime.salary %}
+    <div class="chart-box"><canvas id="cv-comp-life"></canvas></div>
+    <p class="text-xs text-muted mt-1">Gross margin to date:
+      {{ '{:,.2f}'.format(c.composition.lifetime.margin) }} (overhead excluded — no history)</p>
+    {% else %}
+    <div class="chart-empty">No data yet</div>
+    {% endif %}
+  </div>
+  {{ chartcard("Project margin ranking (lifetime)", "cv-margin", c.margin_ranking, wide=True) }}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', path='charts.js') }}"></script>
+<script>
+(function () {
+  if (!window.Charts || !Charts.ok) return;
+  var D = {{ charts | tojson }};
+  var C = Charts.colors;
+  var pick = function (arr, k) { return arr.map(function (r) { return r[k]; }); };
+
+  // ---------- People ----------
+  var ht = D.headcount_trend || [];
+  if (ht.length) {
+    var hm = pick(ht, "month");
+    Charts.line("cv-headcount", {
+      labels: hm,
+      datasets: [{ label: "Headcount", data: pick(ht, "headcount"), color: C.primary }],
+      fill: true, legend: false, beginAtZero: true
+    });
+    Charts.bar("cv-joiners", {
+      labels: hm,
+      datasets: [
+        { label: "Joiners", data: pick(ht, "joiners"), color: C.success },
+        { label: "Leavers", data: pick(ht, "leavers"), color: C.danger }
+      ]
+    });
+  }
+
+  var hb = D.headcount_by || {};
+  function catBar(id, arr, horizontal) {
+    if (!arr || !arr.length) return;
+    Charts.bar(id, {
+      labels: arr.map(function (r) { return r.label; }),
+      datasets: [{ label: "Employees", data: arr.map(function (r) { return r.count; }), color: C.primary }],
+      horizontal: !!horizontal, legend: false
+    });
+  }
+  catBar("cv-team", hb.by_team, false);
+  catBar("cv-desig", hb.by_designation, false);
+  catBar("cv-tech", hb.by_tech_stack, true);
+
+  var al = D.allocation || {};
+  if ((al.assigned || 0) + (al.bench || 0) > 0) {
+    Charts.doughnut("cv-alloc", {
+      labels: ["On a project", "Bench"],
+      values: [al.assigned || 0, al.bench || 0],
+      colors: [C.success, C.muted]
+    });
+  }
+  if (al.per_project && al.per_project.length) {
+    Charts.bar("cv-proj-hc", {
+      labels: al.per_project.map(function (r) { return r.label; }),
+      datasets: [{ label: "Headcount", data: al.per_project.map(function (r) { return r.count; }), color: C.info }],
+      legend: false
+    });
+  }
+
+  var rv = D.reviews_trend || [];
+  if (rv.length) {
+    Charts.bar("cv-reviews", {
+      labels: pick(rv, "month"),
+      datasets: [
+        { label: "Appreciation", data: pick(rv, "appreciation"), color: C.success },
+        { label: "Escalation", data: pick(rv, "escalation"), color: C.danger }
+      ],
+      stacked: true
+    });
+  }
+
+  // ---------- Cost & Profit ----------
+  var ct = D.cost_trend || [];
+  if (ct.length) {
+    Charts.line("cv-cost-trend", {
+      labels: pick(ct, "month"),
+      datasets: [
+        { label: "Net income", data: pick(ct, "net_income"), color: C.info },
+        { label: "Salary cost", data: pick(ct, "salary_cost"), color: C.warn },
+        { label: "Gross margin", data: pick(ct, "profit"), color: C.primary }
+      ],
+      money: true, beginAtZero: false
+    });
+  }
+
+  var pp = D.per_project_pl || [];
+  if (pp.length) {
+    Charts.bar("cv-pp", {
+      labels: pick(pp, "name"),
+      datasets: [
+        { label: "Net income", data: pick(pp, "this_month_net"), color: C.info },
+        { label: "Salary cost", data: pick(pp, "this_month_cost"), color: C.warn },
+        { label: "Profit / loss", data: pick(pp, "this_month_profit"), color: C.primary }
+      ],
+      money: true
+    });
+  }
+
+  var comp = D.composition || { this_month: {}, lifetime: {} };
+  var tm = comp.this_month || {};
+  if (tm.gross || tm.salary) {
+    Charts.doughnut("cv-comp-month", {
+      labels: ["GST", "TDS", "Salary", "Overhead", "Retained profit"],
+      values: [tm.gst || 0, tm.tds || 0, tm.salary || 0, tm.overhead || 0, Math.max(0, tm.profit || 0)],
+      colors: [C.warn, "#0891b2", C.info, C.muted, C.success],
+      money: true
+    });
+  }
+  var lt = comp.lifetime || {};
+  if (lt.gross || lt.salary) {
+    Charts.doughnut("cv-comp-life", {
+      labels: ["GST", "TDS", "Salary paid", "Gross margin"],
+      values: [lt.gst || 0, lt.tds || 0, lt.salary || 0, Math.max(0, lt.margin || 0)],
+      colors: [C.warn, "#0891b2", C.info, C.success],
+      money: true
+    });
+  }
+
+  var mr = D.margin_ranking || [];
+  if (mr.length) {
+    Charts.bar("cv-margin", {
+      labels: pick(mr, "name"),
+      datasets: [{
+        label: "Lifetime margin",
+        data: pick(mr, "lifetime_margin"),
+        color: mr.map(function (r) { return r.lifetime_margin >= 0 ? C.success : C.danger; })
+      }],
+      horizontal: true, money: true, legend: false
+    });
+  }
+})();
+</script>
+{% endblock %}

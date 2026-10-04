@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ team.name }}{% endblock %}
+{% block content %}
+
+<div class="breadcrumb"><a href="/teams">Teams</a> / {{ team.name }}</div>
+
+<div class="page-header">
+  <div>
+    <h1>{{ team.name }}</h1>
+    {% if team.team_lead %}
+    <div class="text-sm text-muted mt-1">
+      Lead: <a href="/employees/{{ team.team_lead_id }}">{{ team.team_lead.name }}</a>
+    </div>
+    {% endif %}
+  </div>
+  <a href="/teams/{{ team.id }}/edit" class="btn btn-outline btn-sm">✏ Edit Team</a>
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem;">
+
+  <div class="card">
+    <div class="card-title">Current Members ({{ current_members|length }})</div>
+    {% if current_members %}
+    <ul class="timeline">
+      {% for m in current_members %}
+      <li>
+        <div class="fw-600"><a href="/employees/{{ m.employee_id }}">{{ m.employee.name }}</a></div>
+        <div class="text-xs text-muted">{{ m.employee.designation }}</div>
+        <div class="timeline-meta">Since {{ m.from_date }}</div>
+        <form method="post" action="/employees/{{ m.employee_id }}/end-team/{{ m.id }}"
+              class="mt-1"
+              onsubmit="return confirm('Remove {{ m.employee.name }} from {{ team.name }}?')">
+          <input type="hidden" name="to_date" value="{{ today }}" />
+          <button type="submit" class="btn btn-outline btn-xs">Remove from team</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state" style="padding:1.5rem;">
+      <span class="empty-icon">👤</span>
+      <p>No current members.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-title">Past Members</div>
+    {% if past_members %}
+    <ul class="timeline">
+      {% for m in past_members %}
+      <li>
+        <div class="fw-600"><a href="/employees/{{ m.employee_id }}">{{ m.employee.name }}</a></div>
+        <div class="timeline-meta">{{ m.from_date }} → {{ m.to_date }}</div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted text-sm">No past members.</p>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

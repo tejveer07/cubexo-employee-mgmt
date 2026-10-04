@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Tech Stacks{% endblock %}
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem;">
+  <h1 style="font-size:1.4rem; font-weight:700;">Tech Stack Library</h1>
+</div>
+
+<!-- Add new -->
+<div class="card" style="max-width:500px; margin-bottom:1.5rem;">
+  <h2 style="font-size:.95rem; font-weight:600; margin-bottom:.75rem;">Add New Tech Stack</h2>
+  <form method="post" action="/techstacks/add-inline" style="display:flex; gap:.5rem;">
+    <input type="hidden" name="return_to" value="/techstacks/" />
+    <input type="text" name="name" placeholder="e.g. Svelte"
+           class="form-control" required autocomplete="off" style="flex:1;" />
+    <button type="submit" class="btn btn-primary">Add</button>
+  </form>
+  <p style="font-size:.78rem; color:var(--muted); margin-top:.4rem;">
+    Names are normalized to Title Case. Duplicates are ignored.
+  </p>
+</div>
+
+<!-- List -->
+<div class="card" style="padding:0; overflow:hidden; max-width:500px;">
+  {% if stacks %}
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Employees</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ts in stacks %}
+      <tr>
+        <td><span class="tag">{{ ts.name }}</span></td>
+        <td style="color:var(--muted);">{{ ts.employees | length }}</td>
+        <td>
+          {% if ts.employees | length == 0 %}
+          <form method="post" action="/techstacks/delete/{{ ts.id }}"
+                onsubmit="return confirm('Delete {{ ts.name }}?')">
+            <button type="submit" class="btn btn-outline btn-sm"
+                    style="color:var(--danger); border-color:var(--danger);">Delete</button>
+          </form>
+          {% else %}
+          <span style="font-size:.78rem; color:var(--muted);">in use</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:2rem; text-align:center; color:var(--muted);">
+    No tech stacks yet. Run <code>python seed_data.py</code> to populate defaults.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

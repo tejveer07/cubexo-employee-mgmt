@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Employee Ops{% endblock %} — CubexO</title>
+  <meta name="description" content="CubexO internal HR and operations management system" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}" />
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+</head>
+<body>
+
+{% if request.session.get("user") %}
+<nav class="topbar">
+  <div class="container">
+    <a href="/" class="brand">⚙ CubexO Ops</a>
+    {% set path = request.url.path %}
+    <a href="/employees" class="nav-link {{ 'active' if path.startswith('/employees') else '' }}">Employees</a>
+    <a href="/teams"     class="nav-link {{ 'active' if path.startswith('/teams')     else '' }}">Teams</a>
+    <a href="/projects"  class="nav-link {{ 'active' if path.startswith('/projects')  else '' }}">Projects</a>
+    <a href="/reviews/new" class="nav-link {{ 'active' if path.startswith('/reviews') else '' }}">Add Review</a>
+    <a href="/techstacks" class="nav-link {{ 'active' if path.startswith('/techstacks') else '' }}">Tech Stacks</a>
+    <a href="/cost-analysis" class="nav-link {{ 'active' if path.startswith('/cost-analysis') else '' }}">Cost Analysis</a>
+    <a href="/analytics" class="nav-link {{ 'active' if path.startswith('/analytics') else '' }}">Analytics</a>
+    <a href="/db/import" class="nav-link {{ 'active' if path.startswith('/db') else '' }}">DB Backup</a>
+    <a href="/settings" class="nav-link {{ 'active' if path.startswith('/settings') else '' }}">Settings</a>
+    <a href="/logout" class="nav-logout">↩ Logout</a>
+  </div>
+</nav>
+{% endif %}
+
+<main class="content">
+  <div class="container">
+
+    {% if request.session.get("_flash_success") %}
+    <div class="alert alert-success">✓ {{ request.session.pop("_flash_success") }}</div>
+    {% endif %}
+    {% if request.session.get("_flash_error") %}
+    <div class="alert alert-error">✕ {{ request.session.pop("_flash_error") }}</div>
+    {% endif %}
+
+    {% if flash_success %}
+    <div class="alert alert-success">✓ {{ flash_success }}</div>
+    {% endif %}
+    {% if flash_error %}
+    <div class="alert alert-error">✕ {{ flash_error }}</div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+
+  </div>
+</main>
+
+{% block scripts %}{% endblock %}
+
+</body>
+</html>

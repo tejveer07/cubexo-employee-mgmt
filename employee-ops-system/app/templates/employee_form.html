@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}{{ employee.name if employee else "New Employee" }}{% endblock %}
+{% block content %}
+
+<div class="breadcrumb">
+  <a href="/employees">Employees</a>
+  {% if employee %} / <a href="/employees/{{ employee.id }}">{{ employee.name }}</a>{% endif %}
+  / {{ "Edit" if employee else "New Employee" }}
+</div>
+
+<div class="page-header">
+  <h1>{{ "Edit — " + employee.name if employee else "New Employee" }}</h1>
+</div>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+{% if tech_added %}
+<div class="alert alert-success">✓ "{{ tech_added }}" added to tech stack list — select it below.</div>
+{% endif %}
+
+<div class="card" style="max-width:680px;">
+  <form id="employee-form" method="post"
+        action="{{ ('/employees/' + employee.id|string + '/edit') if employee else '/employees/new' }}">
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+      <div class="form-group">
+        <label for="emp-name">Full Name *</label>
+        <input id="emp-name" name="name" type="text" class="form-control"
+               value="{{ employee.name if employee else '' }}" required autocomplete="off" />
+      </div>
+      <div class="form-group">
+        <label for="employee_code">Employee Code *</label>
+        <input id="employee_code" name="employee_code" type="text" class="form-control"
+               value="{{ employee.employee_code if employee else '' }}" required />
+      </div>
+      <div class="form-group">
+        <label for="email">Email *</label>
+        <input id="email" name="email" type="email" class="form-control"
+               value="{{ employee.email if employee else '' }}" required />
+      </div>
+      <div class="form-group">
+        <label for="designation">Designation *</label>
+        <input id="designation" name="designation" type="text" class="form-control"
+               value="{{ employee.designation if employee else '' }}" required />
+      </div>
+      <div class="form-group">
+        <label for="join_date">Join Date *</label>
+        <input id="join_date" name="join_date" type="date" class="form-control"
+               value="{{ employee.join_date if employee else '' }}" required />
+      </div>
+      <div class="form-group">
+        <label for="exit_date">Exit Date</label>
+        <input id="exit_date" name="exit_date" type="date" class="form-control"
+               value="{{ employee.exit_date if employee and employee.exit_date else '' }}" />
+      </div>
+      {% if not employee %}
+      <div class="form-group">
+        <label for="monthly_salary">Monthly Salary</label>
+        <input id="monthly_salary" name="monthly_salary" type="number" step="0.01" min="0" class="form-control" />
+        <span class="text-xs text-muted">Later changes are recorded as salary history on the employee's profile.</span>
+      </div>
+      {% endif %}
+      <div class="form-group" style="grid-column:1/-1;">
+        <label for="team_lead_id">Team Lead</label>
+        <select id="team_lead_id" name="team_lead_id" class="form-control">
+          <option value="">— None —</option>
+          {% for e in all_employees %}
+          <option value="{{ e.id }}"
+            {% if employee and employee.team_lead_id == e.id %}selected{% endif %}>
+            {{ e.name }} ({{ e.employee_code }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-top:.5rem;">
+      <label>Tech Stack
+        <span class="text-xs text-muted" style="font-weight:400; margin-left:.5rem;">
+          — missing one? See the separate card below.
+        </span>
+      </label>
+      <div style="display:flex; flex-wrap:wrap; gap:.3rem; margin-top:.5rem;
+                  padding:.65rem; background:var(--bg); border:1px solid var(--border);
+                  border-radius:var(--radius-sm); min-height:44px;">
+        {% for ts in tech_stacks %}
+        <label style="cursor:pointer; display:flex; align-items:center; gap:.3rem;
+                      padding:.2rem .35rem; border-radius:4px;"
+               title="{{ ts.name }}">
+          <input type="checkbox" name="tech_stack_ids" value="{{ ts.id }}"
+                 {% if ts.id in employee_tech_ids %}checked{% endif %} />
+          <span class="tag" style="margin:0; cursor:pointer;">{{ ts.name }}</span>
+        </label>
+        {% endfor %}
+        {% if not tech_stacks %}
+        <span class="text-muted text-sm">No tech stacks seeded.</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="d-flex gap-1 mt-3">
+      <button type="submit" class="btn btn-primary">
+        {{ "Save Changes" if employee else "Create Employee" }}
+      </button>
+      <a href="{{ '/employees/' + employee.id|string if employee else '/employees' }}"
+         class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+
+{# ── SEPARATE form for adding a new tech stack — NOT nested inside the employee form ── #}
+<div class="card" style="max-width:680px;">
+  <details {% if tech_added %}open{% endif %}>
+    <summary style="cursor:pointer; font-weight:600; font-size:.875rem; color:var(--primary);">
+      + Add a missing tech stack
+    </summary>
+    <div class="mt-2">
+      <form method="post" action="/techstacks/add-inline"
+            style="display:flex; gap:.5rem; align-items:flex-end; flex-wrap:wrap;">
+        <input type="hidden" name="return_to"
+               value="{{ ('/employees/' + employee.id|string + '/edit') if employee else '/employees/new' }}" />
+        <div>
+          <label class="text-xs text-muted" style="display:block; margin-bottom:.25rem;">
+            Tech Stack Name
+          </label>
+          <input type="text" name="name" placeholder="e.g. Svelte"
+                 class="form-control" style="width:220px;" required autocomplete="off" />
+        </div>
+        <button type="submit" class="btn btn-outline btn-sm">Add to list</button>
+      </form>
+      <p class="text-xs text-muted mt-1">
+        Added stacks appear in the checkbox list above immediately after the page reloads.
+      </p>
+    </div>
+  </details>
+</div>
+
+{% endblock %}

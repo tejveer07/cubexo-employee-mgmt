@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% block title %}Cost Analysis{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>Cost Analysis</h1>
+</div>
+
+{% if unset_employee_count > 0 or unset_project_count > 0 %}
+<div class="alert alert-warn">
+  ⚠ {{ unset_employee_count }} active employee(s) and {{ unset_project_count }} project(s) have no salary/income recorded —
+  totals below are understated for them.
+</div>
+{% endif %}
+
+<div class="chart-section-title">Trends &amp; Breakdown</div>
+<div class="chart-grid">
+  <div class="chart-card chart-wide">
+    <h3>Net income, salary cost &amp; gross margin over time</h3>
+    {% if cost_charts.cost_trend %}
+    <div class="chart-box"><canvas id="ca-trend"></canvas></div>
+    {% else %}<div class="chart-empty">No data yet</div>{% endif %}
+  </div>
+  <div class="chart-card chart-wide">
+    <h3>Per-project net income vs cost vs profit (this month)</h3>
+    {% if cost_charts.per_project_pl %}
+    <div class="chart-box"><canvas id="ca-pp"></canvas></div>
+    {% else %}<div class="chart-empty">No projects yet</div>{% endif %}
+  </div>
+  <div class="chart-card">
+    <h3>This month — where gross income goes</h3>
+    {% if cost_charts.composition.this_month.gross or cost_charts.composition.this_month.salary %}
+    <div class="chart-box"><canvas id="ca-comp"></canvas></div>
+    <p class="text-xs text-muted mt-1">Net profit / loss:
+      {{ '{:,.2f}'.format(cost_charts.composition.this_month.profit) }}</p>
+    {% else %}<div class="chart-empty">No data yet</div>{% endif %}
+  </div>
+  <div class="chart-card chart-wide">
+    <h3>Project margin ranking (lifetime)</h3>
+    {% if cost_charts.margin_ranking %}
+    <div class="chart-box"><canvas id="ca-margin"></canvas></div>
+    {% else %}<div class="chart-empty">No projects yet</div>{% endif %}
+  </div>
+</div>
+
+<div class="card-title">This Month</div>
+<div class="stat-grid">
+  <div class="stat-card">
+    <span class="stat-value">{{ '{:,.2f}'.format(org_snapshot.total_gross_income) }}</span>
+    <span class="stat-label">Total Gross Income</span>
+  </div>
+  <div class="stat-card stat-muted">
+    <span class="stat-value">{{ '{:,.2f}'.format(org_snapshot.total_gst) }}</span>
+    <span class="stat-label">Total GST</span>
+  </div>
+  <div class="stat-card stat-muted">
+    <span class="stat-value">{{ '{:,.2f}'.format(org_snapshot.total_tds) }}</span>
+    <span class="stat-label">Total TDS</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-value">{{ '{:,.2f}'.format(org_snapshot.total_net_income) }}</span>
+    <span class="stat-label">Total Net Income</span>
+  </div>
+  <div class="stat-card stat-muted">
+    <span class="stat-value">{{ '{:,.2f}'.format(org_snapshot.total_salary_cost) }}</span>
+    <span class="stat-label">Total Salary Cost</span>
+  </div>
+  <div class="stat-card stat-muted">
+    <span class="stat-value">{{ '{:,.2f}'.format(org_snapshot.overhead) }}</span>
+    <span class="stat-label">Admin / Management Overhead</span>
+  </div>
+  <div class="stat-card {{ 'stat-success' if org_snapshot.profit >= 0 else 'stat-danger' }}">
+    <span class="stat-value">{{ '{:,.2f}'.format(org_snapshot.profit) }}</span>
+    <span class="stat-label">Net Profit / Loss</span>
+  </div>
+</div>
+
+<div class="card-title">Lifetime (to date)</div>
+<div class="stat-grid">
+  <div class="stat-card">
+    <span class="stat-value">{{ '{:,.2f}'.format(org_lifetime.total_gross_income_to_date) }}</span>
+    <span class="stat-label">Total Gross Income to Date</span>
+  </div>
+  <div class="stat-card stat-muted">
+    <span class="stat-value">{{ '{:,.2f}'.format(org_lifetime.total_gst_to_date) }}</span>
+    <span class="stat-label">Total GST to Date</span>
+  </div>
+  <div class="stat-card stat-muted">
+    <span class="stat-value">{{ '{:,.2f}'.format(org_lifetime.total_tds_to_date) }}</span>
+    <span class="stat-label">Total TDS to Date</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-value">{{ '{:,.2f}'.format(org_lifetime.total_net_income_to_date) }}</span>
+    <span class="stat-label">Total Net Income to Date</span>
+  </div>
+  <div class="stat-card stat-muted">
+    <span class="stat-value">{{ '{:,.2f}'.format(org_lifetime.total_salary_paid_to_date) }}</span>
+    <span class="stat-label">Total Salary Paid to Date</span>
+  </div>
+  <div class="stat-card {{ 'stat-success' if org_lifetime.gross_margin_to_date >= 0 else 'stat-danger' }}">
+    <span class="stat-value">{{ '{:,.2f}'.format(org_lifetime.gross_margin_to_date) }}</span>
+    <span class="stat-label">Gross Margin to Date</span>
+  </div>
+</div>
+<p class="text-xs text-muted mt-1" style="margin-top:-1rem; margin-bottom:1.75rem;">
+  Gross margin to date excludes overhead — overhead is a single current figure with no historical record,
+  so it is only netted out in the "This Month" view above. GST and TDS above DO correctly reflect rate changes
+  over time (both are tracked historically), unlike overhead.
+  "Total Salary Cost" and "Total Salary Paid to Date" count <strong>every</strong> active / on-record
+  employee, including bench and unassigned staff, so they will not equal the sum of the Per-Project
+  Breakdown cost column below.
+</p>
+
+<div class="table-wrap">
+  <div style="padding:.65rem .9rem; background:var(--bg); border-bottom:1px solid var(--border);">
+    <span class="card-title" style="margin:0;">Per-Project Breakdown</span>
+  </div>
+  {% if rows %}
+  <table>
+    <thead>
+      <tr>
+        <th>Project</th>
+        <th>Status</th>
+        <th>TDS %</th>
+        <th>This-Month Net Income</th>
+        <th>This-Month Cost</th>
+        <th>This-Month P/L</th>
+        <th>Lifetime Net Income</th>
+        <th>Lifetime Cost</th>
+        <th>Lifetime Gross Margin</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td><a href="/projects/{{ row.project.id }}" style="font-weight:600;">{{ row.project.name }}</a></td>
+        <td>
+          <span class="badge
+            {% if row.project.status.value == 'active' %}badge-green
+            {% elif row.project.status.value == 'on_hold' %}badge-yellow
+            {% else %}badge-gray{% endif %}">
+            {{ row.project.status.value.replace('_',' ').title() }}
+          </span>
+        </td>
+        <td class="text-sm text-muted">
+          {{ row.project.tds_rate if row.project.tds_rate is not none else 0 }}%
+          {% if not row.project.gst_applicable %}<span class="badge badge-gray" style="margin-left:.2rem;">GST exempt</span>{% endif %}
+        </td>
+        <td class="text-sm">{{ '{:,.2f}'.format(row.snapshot.net_income) }}</td>
+        <td class="text-sm text-muted">{{ '{:,.2f}'.format(row.snapshot.cost) }}</td>
+        <td class="text-sm" style="color: {{ 'var(--success)' if row.snapshot.profit > 0 else ('var(--danger)' if row.snapshot.profit < 0 else '') }};">
+          {{ '{:,.2f}'.format(row.snapshot.profit) }}
+        </td>
+        <td class="text-sm">{{ '{:,.2f}'.format(row.lifetime.net_income_to_date) }}</td>
+        <td class="text-sm text-muted">{{ '{:,.2f}'.format(row.lifetime.cost_to_date) }}</td>
+        <td class="text-sm" style="color: {{ 'var(--success)' if row.lifetime.profit_to_date > 0 else ('var(--danger)' if row.lifetime.profit_to_date < 0 else '') }};">
+          {{ '{:,.2f}'.format(row.lifetime.profit_to_date) }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">
+    <span class="empty-icon">📁</span>
+    <p>No projects yet.</p>
+  </div>
+  {% endif %}
+</div>
+
+<div class="d-flex gap-1 flex-wrap mt-2">
+  <div class="card" style="max-width:360px; flex:1; min-width:280px;">
+    <div class="card-title">Admin / Management Overhead</div>
+    <form method="post" action="/cost-analysis/overhead">
+      <div class="form-group">
+        <label for="monthly_overhead">Monthly Overhead</label>
+        <input id="monthly_overhead" name="monthly_overhead" type="number" step="0.01" min="0" class="form-control"
+               value="{{ '%.2f'|format(org_snapshot.overhead) }}" required />
+      </div>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+    <p class="text-xs text-muted mt-1">No history — always applies as-of today, in the This-Month view only.</p>
+  </div>
+
+  <div class="card" style="max-width:360px; flex:1; min-width:280px;">
+    <div class="card-title">GST Rate</div>
+    <p class="text-sm mb-2">Current: <strong>{{ current_gst_rate }}%</strong></p>
+    <form method="post" action="/cost-analysis/gst-rate">
+      <div class="form-group">
+        <label for="gst_rate">New GST Rate (%)</label>
+        <input id="gst_rate" name="gst_rate" type="number" step="0.01" min="0" max="100" class="form-control" required />
+      </div>
+      <div class="form-group">
+        <label for="gst_effective_from">Effective From</label>
+        <input id="gst_effective_from" name="effective_from" type="date" class="form-control" required />
+      </div>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+    <p class="text-xs text-muted mt-1">Tracked historically — only affects months from the effective date forward.</p>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', path='charts.js') }}"></script>
+<script>
+(function () {
+  if (!window.Charts || !Charts.ok) return;
+  var D = {{ cost_charts | tojson }};
+  var C = Charts.colors;
+  var pick = function (arr, k) { return arr.map(function (r) { return r[k]; }); };
+
+  var ct = D.cost_trend || [];
+  if (ct.length) {
+    Charts.line("ca-trend", {
+      labels: pick(ct, "month"),
+      datasets: [
+        { label: "Net income", data: pick(ct, "net_income"), color: C.info },
+        { label: "Salary cost", data: pick(ct, "salary_cost"), color: C.warn },
+        { label: "Gross margin", data: pick(ct, "profit"), color: C.primary }
+      ],
+      money: true, beginAtZero: false
+    });
+  }
+
+  var pp = D.per_project_pl || [];
+  if (pp.length) {
+    Charts.bar("ca-pp", {
+      labels: pick(pp, "name"),
+      datasets: [
+        { label: "Net income", data: pick(pp, "this_month_net"), color: C.info },
+        { label: "Salary cost", data: pick(pp, "this_month_cost"), color: C.warn },
+        { label: "Profit / loss", data: pick(pp, "this_month_profit"), color: C.primary }
+      ],
+      money: true
+    });
+  }
+
+  var tm = (D.composition || {}).this_month || {};
+  if (tm.gross || tm.salary) {
+    Charts.doughnut("ca-comp", {
+      labels: ["GST", "TDS", "Salary", "Overhead", "Retained profit"],
+      values: [tm.gst || 0, tm.tds || 0, tm.salary || 0, tm.overhead || 0, Math.max(0, tm.profit || 0)],
+      colors: [C.warn, "#0891b2", C.info, C.muted, C.success],
+      money: true
+    });
+  }
+
+  var mr = D.margin_ranking || [];
+  if (mr.length) {
+    Charts.bar("ca-margin", {
+      labels: pick(mr, "name"),
+      datasets: [{
+        label: "Lifetime margin",
+        data: pick(mr, "lifetime_margin"),
+        color: mr.map(function (r) { return r.lifetime_margin >= 0 ? C.success : C.danger; })
+      }],
+      horizontal: true, money: true, legend: false
+    });
+  }
+})();
+</script>
+{% endblock %}

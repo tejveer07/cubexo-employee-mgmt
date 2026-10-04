@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>Settings</h1>
+</div>
+
+<div class="d-flex gap-1 flex-wrap mt-2">
+
+  <div class="card" style="max-width:460px; flex:1; min-width:300px;">
+    <div class="card-title">Email Notifications (SMTP)</div>
+    <p class="text-sm mb-2 text-muted">
+      When enabled, an employee is emailed whenever they're assigned to a project.
+    </p>
+
+    <form method="post" action="/settings/email">
+      <div class="form-group">
+        <label style="display:flex; align-items:center; gap:.4rem; cursor:pointer;">
+          <input type="checkbox" name="email_enabled" value="true"
+                 {% if s and s.email_enabled %}checked{% endif %} />
+          Enable assignment emails
+        </label>
+      </div>
+
+      <div class="form-group">
+        <label for="smtp_host">SMTP Host</label>
+        <input id="smtp_host" name="smtp_host" type="text" class="form-control"
+               value="{{ s.smtp_host or '' }}" placeholder="smtp.gmail.com" />
+      </div>
+
+      <div class="form-group">
+        <label for="smtp_port">SMTP Port</label>
+        <input id="smtp_port" name="smtp_port" type="number" min="1" max="65535" class="form-control"
+               value="{{ s.smtp_port or '' }}" placeholder="587" />
+      </div>
+
+      <div class="form-group">
+        <label style="display:flex; align-items:center; gap:.4rem; cursor:pointer;">
+          <input type="checkbox" name="smtp_use_tls" value="true"
+                 {% if not s or s.smtp_use_tls %}checked{% endif %} />
+          Use STARTTLS (port 587)
+        </label>
+      </div>
+      <div class="form-group">
+        <label style="display:flex; align-items:center; gap:.4rem; cursor:pointer;">
+          <input type="checkbox" name="smtp_use_ssl" value="true"
+                 {% if s and s.smtp_use_ssl %}checked{% endif %} />
+          Use SSL / implicit TLS (port 465)
+        </label>
+      </div>
+
+      <div class="form-group">
+        <label for="smtp_username">Username</label>
+        <input id="smtp_username" name="smtp_username" type="text" class="form-control"
+               value="{{ s.smtp_username or '' }}" autocomplete="off" />
+      </div>
+
+      <div class="form-group">
+        <label for="smtp_password">Password</label>
+        <input id="smtp_password" name="smtp_password" type="password" class="form-control"
+               autocomplete="new-password"
+               placeholder="{% if has_password %}•••••••• (leave blank to keep current){% else %}(not set){% endif %}" />
+      </div>
+
+      <div class="form-group">
+        <label for="email_from">From Address</label>
+        <input id="email_from" name="email_from" type="email" class="form-control"
+               value="{{ s.email_from or '' }}" placeholder="defaults to the username" />
+      </div>
+
+      <div class="form-group">
+        <label for="email_from_name">From Name</label>
+        <input id="email_from_name" name="email_from_name" type="text" class="form-control"
+               value="{{ s.email_from_name or '' }}" placeholder="CubexO Operations" />
+      </div>
+
+      <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+
+    <p class="text-xs text-muted mt-1">
+      The password is stored in the app database. A DB export (DB Backup page) will contain it.
+    </p>
+  </div>
+
+  <div class="card" style="max-width:460px; flex:1; min-width:300px;">
+    <div class="card-title">Send a Test Email</div>
+    <p class="text-sm mb-2 text-muted">
+      Uses the settings currently saved on the left. Save any changes first.
+    </p>
+    <form method="post" action="/settings/email/test">
+      <div class="form-group">
+        <label for="test_to">Send to</label>
+        <input id="test_to" name="test_to" type="email" class="form-control" required
+               placeholder="you@example.com" />
+      </div>
+      <button type="submit" class="btn btn-primary">Send test</button>
+    </form>
+  </div>
+
+</div>
+
+{% endblock %}

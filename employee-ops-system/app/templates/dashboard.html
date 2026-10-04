@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>Dashboard</h1>
+  <a href="/employees/new" class="btn btn-primary">+ New Employee</a>
+</div>
+
+<!-- Stat cards -->
+<div class="stat-grid">
+  <div class="stat-card">
+    <span class="stat-value">{{ total_active }}</span>
+    <span class="stat-label">Active Employees</span>
+  </div>
+  <div class="stat-card stat-muted">
+    <span class="stat-value">{{ total_inactive }}</span>
+    <span class="stat-label">Alumni / Inactive</span>
+  </div>
+  <div class="stat-card stat-success">
+    <span class="stat-value">{{ active_projects }}</span>
+    <span class="stat-label">Active Projects</span>
+  </div>
+  <div class="stat-card {{ 'stat-success' if org_snapshot.profit >= 0 else 'stat-danger' }}">
+    <span class="stat-value">{{ '{:,.2f}'.format(org_snapshot.profit) }}</span>
+    <span class="stat-label">This Month Profit/Loss</span>
+  </div>
+</div>
+
+<!-- At-a-glance charts -->
+<div class="chart-grid">
+  <div class="chart-card">
+    <h3>Headcount over time</h3>
+    {% if dash_charts.headcount_trend %}
+    <div class="chart-box"><canvas id="dash-headcount"></canvas></div>
+    {% else %}<div class="chart-empty">No data yet</div>{% endif %}
+  </div>
+  <div class="chart-card">
+    <h3>This month — where gross income goes</h3>
+    {% if dash_charts.composition.this_month.gross or dash_charts.composition.this_month.salary %}
+    <div class="chart-box"><canvas id="dash-comp"></canvas></div>
+    <p class="text-xs text-muted mt-1">Net profit / loss:
+      {{ '{:,.2f}'.format(dash_charts.composition.this_month.profit) }}</p>
+    {% else %}<div class="chart-empty">No data yet</div>{% endif %}
+  </div>
+</div>
+
+<!-- Quick links -->
+<div class="d-flex gap-1 flex-wrap mb-2">
+  <a href="/employees" class="btn btn-outline">👥 All Employees</a>
+  <a href="/teams"     class="btn btn-outline">🏷 Teams</a>
+  <a href="/projects"  class="btn btn-outline">📁 Projects</a>
+  <a href="/reviews/new" class="btn btn-outline">📝 Add Review</a>
+  <a href="/cost-analysis" class="btn btn-outline">📊 Cost Analysis</a>
+  <a href="/analytics" class="btn btn-outline">📈 Analytics</a>
+</div>
+
+<!-- Recent reviews -->
+<div class="card">
+  <div class="d-flex align-center justify-between mb-2">
+    <span class="card-title" style="margin-bottom:0;">Recent Reviews</span>
+    <a href="/reviews/new" class="btn btn-outline btn-sm">+ Add Review</a>
+  </div>
+
+  {% if recent_reviews %}
+  <ul class="timeline">
+    {% for r in recent_reviews %}
+    <li>
+      <div class="d-flex align-center gap-1 flex-wrap">
+        <span class="badge {{ 'badge-green' if r.type.value == 'appreciation' else 'badge-red' }}">
+          {{ r.type.value.title() }}
+        </span>
+        <a href="/employees/{{ r.employee_id }}" class="fw-600">{{ r.employee.name }}</a>
+      </div>
+      <div class="timeline-meta">
+        by <a href="/employees/{{ r.reviewer_id }}">{{ r.reviewer.name }}</a>
+        &nbsp;·&nbsp; {{ r.date }}
+      </div>
+      {% if r.notes %}
+      <div class="text-sm mt-1" style="color:var(--text);">
+        {{ r.notes[:150] }}{% if r.notes|length > 150 %}…{% endif %}
+      </div>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="empty-state" style="padding:2rem;">
+    <span class="empty-icon">📝</span>
+    <p>No reviews logged yet.</p>
+    <a href="/reviews/new" class="btn btn-primary">Log first review</a>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', path='charts.js') }}"></script>
+<script>
+(function () {
+  if (!window.Charts || !Charts.ok) return;
+  var D = {{ dash_charts | tojson }};
+  var C = Charts.colors;
+  var pick = function (arr, k) { return arr.map(function (r) { return r[k]; }); };
+
+  var ht = D.headcount_trend || [];
+  if (ht.length) {
+    Charts.line("dash-headcount", {
+      labels: pick(ht, "month"),
+      datasets: [{ label: "Headcount", data: pick(ht, "headcount"), color: C.primary }],
+      fill: true, legend: false
+    });
+  }
+
+  var tm = (D.composition || {}).this_month || {};
+  if (tm.gross || tm.salary) {
+    Charts.doughnut("dash-comp", {
+      labels: ["GST", "TDS", "Salary", "Overhead", "Retained profit"],
+      values: [tm.gst || 0, tm.tds || 0, tm.salary || 0, tm.overhead || 0, Math.max(0, tm.profit || 0)],
+      colors: [C.warn, "#0891b2", C.info, C.muted, C.success],
+      money: true
+    });
+  }
+})();
+</script>
+{% endblock %}

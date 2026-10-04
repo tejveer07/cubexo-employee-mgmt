@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name if project else "New Project" }}{% endblock %}
+{% block content %}
+
+<div class="breadcrumb">
+  <a href="/projects">Projects</a>
+  {% if project %} / <a href="/projects/{{ project.id }}">{{ project.name }}</a>{% endif %}
+  / {{ "Edit" if project else "New Project" }}
+</div>
+
+<div class="page-header">
+  <h1>{{ "Edit — " + project.name if project else "New Project" }}</h1>
+</div>
+
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+
+<div class="card" style="max-width:560px;">
+  <form method="post" action="{{ ('/projects/' + project.id|string + '/edit') if project else '/projects/new' }}">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+      <div class="form-group" style="grid-column:1/-1;">
+        <label for="name">Project Name *</label>
+        <input id="name" name="name" type="text" class="form-control"
+               value="{{ project.name if project else '' }}" required />
+      </div>
+      <div class="form-group" style="grid-column:1/-1;">
+        <label for="client">Client *</label>
+        <input id="client" name="client" type="text" class="form-control"
+               value="{{ project.client if project else '' }}" required />
+      </div>
+      <div class="form-group">
+        <label for="status">Status</label>
+        <select id="status" name="status" class="form-control">
+          <option value="active"    {% if not project or project.status.value == 'active'    %}selected{% endif %}>Active</option>
+          <option value="on_hold"   {% if project and project.status.value == 'on_hold'   %}selected{% endif %}>On Hold</option>
+          <option value="completed" {% if project and project.status.value == 'completed' %}selected{% endif %}>Completed</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="start_date">Start Date *</label>
+        <input id="start_date" name="start_date" type="date" class="form-control"
+               value="{{ project.start_date if project else '' }}" required />
+      </div>
+      <div class="form-group">
+        <label for="end_date">End Date</label>
+        <input id="end_date" name="end_date" type="date" class="form-control"
+               value="{{ project.end_date if project and project.end_date else '' }}" />
+      </div>
+      {% if not project %}
+      <div class="form-group" style="grid-column:1/-1;">
+        <label for="monthly_income">Monthly Income (recurring)</label>
+        <input id="monthly_income" name="monthly_income" type="number" step="0.01" min="0" class="form-control" />
+        <span class="text-xs text-muted">Later changes are recorded as income history on the project page.</span>
+      </div>
+      {% endif %}
+      <div class="form-group">
+        <label for="tds_rate">TDS Rate (%)</label>
+        <input id="tds_rate" name="tds_rate" type="number" step="0.01" min="0" max="100" class="form-control"
+               value="{{ project.tds_rate if project and project.tds_rate is not none else '' }}" />
+      </div>
+      <div class="form-group" style="align-self:end;">
+        <label style="display:flex; align-items:center; gap:.4rem; cursor:pointer;">
+          <input type="checkbox" name="gst_applicable" value="true"
+                 {% if not project or project.gst_applicable %}checked{% endif %} />
+          GST Applicable
+        </label>
+        <span class="text-xs text-muted">Uncheck for GST-exempt clients (e.g. export/SEZ).</span>
+      </div>
+    </div>
+    <div class="d-flex gap-1 mt-3">
+      <button type="submit" class="btn btn-primary">{{ "Save Changes" if project else "Create Project" }}</button>
+      <a href="{{ '/projects/' + project.id|string if project else '/projects' }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

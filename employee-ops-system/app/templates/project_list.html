@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Projects{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>Projects</h1>
+  <a href="/projects/new" class="btn btn-primary">+ New Project</a>
+</div>
+
+<!-- Status filter tabs -->
+<div class="tab-row">
+  {% for s, label in [('active','Active'), ('on_hold','On Hold'), ('completed','Completed')] %}
+  <a href="/projects?status={{ s }}"
+     class="btn btn-sm {{ 'btn-primary' if current_status == s else 'btn-outline' }}">
+    {{ label }}
+  </a>
+  {% endfor %}
+  <a href="/projects?status=" class="btn btn-sm btn-ghost">All</a>
+</div>
+
+<div class="table-wrap">
+  {% if projects %}
+  <table>
+    <thead>
+      <tr>
+        <th>Project</th>
+        <th>Client</th>
+        <th>Start</th>
+        <th>End</th>
+        <th>Status</th>
+        <th>Active Team</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in projects %}
+      {% set active_count = p.assignments | selectattr("to_date", "none") | list | length %}
+      <tr>
+        <td>
+          <a href="/projects/{{ p.id }}" style="font-weight:600; color:var(--text);">{{ p.name }}</a>
+        </td>
+        <td class="text-sm">{{ p.client }}</td>
+        <td class="text-sm text-muted">{{ p.start_date }}</td>
+        <td class="text-sm text-muted">{{ p.end_date or "—" }}</td>
+        <td>
+          <span class="badge
+            {% if p.status.value == 'active' %}badge-green
+            {% elif p.status.value == 'on_hold' %}badge-yellow
+            {% else %}badge-gray{% endif %}">
+            {{ p.status.value.replace('_',' ').title() }}
+          </span>
+        </td>
+        <td>
+          <span class="badge badge-blue">{{ active_count }} member{{ 's' if active_count != 1 }}</span>
+        </td>
+        <td>
+          <a href="/projects/{{ p.id }}/edit" class="btn btn-outline btn-xs">Edit</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">
+    <span class="empty-icon">📁</span>
+    <p>No {{ current_status.replace('_', ' ') if current_status else '' }} projects found.</p>
+    <a href="/projects/new" class="btn btn-primary btn-sm">Create a project</a>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

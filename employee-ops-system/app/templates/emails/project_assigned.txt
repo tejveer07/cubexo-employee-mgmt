@@ -1,0 +1,11 @@
+Hi {{ employee_name }},
+
+You have been assigned to the project {{ project_name }} ({{ client }}).
+
+  Role:       {{ role }}
+  Start date: {{ from_date }}
+
+If you have any questions about this assignment, please reach out to your team lead.
+
+--
+This is an automated message from {{ from_name }}.

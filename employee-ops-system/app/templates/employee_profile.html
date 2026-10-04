@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+{% block title %}{{ emp.name }}{% endblock %}
+{% block content %}
+
+<!-- Breadcrumb + header -->
+<div class="breadcrumb">
+  <a href="/employees">Employees</a> / {{ emp.name }}
+</div>
+
+<div class="page-header">
+  <div>
+    <h1>{{ emp.name }}</h1>
+    <div class="d-flex align-center gap-1 mt-1 flex-wrap">
+      <span class="mono text-muted text-sm">{{ emp.employee_code }}</span>
+      <span class="text-muted text-sm">·</span>
+      <span class="text-sm">{{ emp.designation }}</span>
+      <span class="badge {{ 'badge-green' if emp.status.value == 'active' else 'badge-gray' }}">
+        {{ emp.status.value.title() }}
+      </span>
+    </div>
+  </div>
+  <div class="d-flex gap-1 flex-wrap">
+    <a href="/employees/{{ emp.id }}/edit" class="btn btn-outline btn-sm">✏ Edit</a>
+    {% if emp.status.value == 'active' %}
+    <form method="post" action="/employees/{{ emp.id }}/deactivate"
+          onsubmit="return confirm('Deactivate {{ emp.name }}?\n\nThis will also close all open team and project assignments.')">
+      <input type="hidden" name="exit_date" value="{{ today }}" />
+      <button type="submit" class="btn btn-danger btn-sm">Deactivate</button>
+    </form>
+    {% else %}
+    <form method="post" action="/employees/{{ emp.id }}/reactivate">
+      <button type="submit" class="btn btn-outline btn-sm">Reactivate</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem;">
+
+  <!-- Basic info -->
+  <div class="card">
+    <div class="card-title">Employee Info</div>
+    <table class="info-table">
+      <tr><td>Email</td>     <td><a href="mailto:{{ emp.email }}">{{ emp.email }}</a></td></tr>
+      <tr><td>Joined</td>    <td>{{ emp.join_date }}</td></tr>
+      {% if emp.exit_date %}
+      <tr><td>Left</td>      <td>{{ emp.exit_date }}</td></tr>
+      {% endif %}
+      <tr><td>Team Lead</td>
+          <td>{% if emp.team_lead %}
+            <a href="/employees/{{ emp.team_lead_id }}">{{ emp.team_lead.name }}</a>
+          {% else %}<span class="text-muted">—</span>{% endif %}</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- Tech stack -->
+  <div class="card">
+    <div class="card-title">Tech Stack</div>
+    {% if emp.tech_stacks %}
+    <div style="display:flex; flex-wrap:wrap; gap:.2rem;">
+      {% for et in emp.tech_stacks %}
+      <span class="tag">{{ et.tech_stack.name }}</span>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted text-sm">No tech stack assigned.</p>
+    {% endif %}
+    <div class="mt-2">
+      <a href="/employees/{{ emp.id }}/edit" class="btn btn-outline btn-xs">Edit tech stack</a>
+    </div>
+  </div>
+
+  <!-- Team history -->
+  <div class="card">
+    <div class="d-flex align-center justify-between mb-2">
+      <span class="card-title" style="margin-bottom:0;">Team History</span>
+      {% if emp.status.value == 'active' %}
+      <button class="btn btn-outline btn-xs"
+              onclick="document.getElementById('assign-team-form').style.display='block';this.style.display='none'">
+        + Assign Team
+      </button>
+      {% endif %}
+    </div>
+
+    <div id="assign-team-form" style="display:none; background:var(--bg); padding:.75rem;
+         border-radius:var(--radius-sm); margin-bottom:.75rem; border:1px solid var(--border);">
+      <form method="post" action="/employees/{{ emp.id }}/assign-team">
+        <div class="d-flex gap-1 flex-wrap align-center">
+          <div>
+            <label class="text-xs text-muted">Team</label>
+            <select name="team_id" class="form-control" required>
+              {% for t in all_teams %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-muted">From Date</label>
+            <input type="date" name="from_date" value="{{ today }}" class="form-control" required />
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" style="align-self:flex-end;">Save</button>
+          <button type="button" class="btn btn-ghost btn-sm" style="align-self:flex-end;"
+                  onclick="this.closest('#assign-team-form').style.display='none'">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+    {% if team_history %}
+    <ul class="timeline">
+      {% for m in team_history %}
+      <li>
+        <div class="fw-600"><a href="/teams/{{ m.team_id }}">{{ m.team.name }}</a>
+          {% if not m.to_date %}<span class="badge badge-green" style="margin-left:.3rem;">current</span>{% endif %}
+        </div>
+        <div class="timeline-meta">{{ m.from_date }} → {{ m.to_date or "present" }}</div>
+        {% if not m.to_date and emp.status.value == 'active' %}
+        <form method="post" action="/employees/{{ emp.id }}/end-team/{{ m.id }}" class="mt-1"
+              onsubmit="return confirm('End membership in {{ m.team.name }}?')">
+          <input type="hidden" name="to_date" value="{{ today }}" />
+          <button type="submit" class="btn btn-outline btn-xs">End membership</button>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted text-sm">No team assignments yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- Project history -->
+  <div class="card">
+    <div class="d-flex align-center justify-between mb-2">
+      <span class="card-title" style="margin-bottom:0;">Project History</span>
+      {% if emp.status.value == 'active' %}
+      <button class="btn btn-outline btn-xs"
+              onclick="document.getElementById('assign-project-form').style.display='block';this.style.display='none'">
+        + Assign Project
+      </button>
+      {% endif %}
+    </div>
+
+    <div id="assign-project-form" style="display:none; background:var(--bg); padding:.75rem;
+         border-radius:var(--radius-sm); margin-bottom:.75rem; border:1px solid var(--border);">
+      <form method="post" action="/employees/{{ emp.id }}/assign-project">
+        <div class="d-flex gap-1 flex-wrap align-center">
+          <div>
+            <label class="text-xs text-muted">Project</label>
+            <select name="project_id" class="form-control" required>
+              {% for p in all_projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-muted">Role</label>
+            <input type="text" name="role_on_project" placeholder="e.g. Backend Dev"
+                   class="form-control" required style="width:160px;" />
+          </div>
+          <div>
+            <label class="text-xs text-muted">From Date</label>
+            <input type="date" name="from_date" value="{{ today }}" class="form-control" required />
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" style="align-self:flex-end;">Save</button>
+          <button type="button" class="btn btn-ghost btn-sm" style="align-self:flex-end;"
+                  onclick="this.closest('#assign-project-form').style.display='none'">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+    {% if project_history %}
+    <ul class="timeline">
+      {% for a in project_history %}
+      <li>
+        <div>
+          <a href="/projects/{{ a.project_id }}" class="fw-600">{{ a.project.name }}</a>
+          <span class="badge badge-blue" style="margin-left:.3rem;">{{ a.role_on_project }}</span>
+          {% if not a.to_date %}<span class="badge badge-green" style="margin-left:.2rem;">ongoing</span>{% endif %}
+        </div>
+        <div class="timeline-meta">{{ a.from_date }} → {{ a.to_date or "present" }}</div>
+        {% if not a.to_date and emp.status.value == 'active' %}
+        <form method="post" action="/employees/{{ emp.id }}/end-project/{{ a.id }}" class="mt-1"
+              onsubmit="return confirm('End assignment on {{ a.project.name }}?')">
+          <input type="hidden" name="to_date" value="{{ today }}" />
+          <button type="submit" class="btn btn-outline btn-xs">End assignment</button>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted text-sm">No project assignments yet.</p>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Salary history -->
+<div class="card">
+  <div class="d-flex align-center justify-between mb-2">
+    <span class="card-title" style="margin-bottom:0;">Salary History</span>
+    <button class="btn btn-outline btn-xs"
+            onclick="document.getElementById('salary-change-form').style.display='block';this.style.display='none'">
+      + Record Salary Change
+    </button>
+  </div>
+
+  <div id="salary-change-form" style="display:none; background:var(--bg); padding:.75rem;
+       border-radius:var(--radius-sm); margin-bottom:.75rem; border:1px solid var(--border);">
+    <form method="post" action="/employees/{{ emp.id }}/update-salary">
+      <div class="d-flex gap-1 flex-wrap align-center">
+        <div>
+          <label class="text-xs text-muted">Monthly Salary</label>
+          <input type="number" step="0.01" min="0" name="monthly_salary" class="form-control" required />
+        </div>
+        <div>
+          <label class="text-xs text-muted">Effective From</label>
+          <input type="date" name="effective_from" value="{{ today }}" class="form-control" required />
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm" style="align-self:flex-end;">Save</button>
+        <button type="button" class="btn btn-ghost btn-sm" style="align-self:flex-end;"
+                onclick="this.closest('#salary-change-form').style.display='none'">Cancel</button>
+      </div>
+    </form>
+    <p class="text-xs text-muted mt-1">
+      A change here only affects months from the effective date forward — past Lifetime cost figures are unaffected.
+      Submitting the same date again overwrites that date's rate.
+    </p>
+  </div>
+
+  {% if salary_history %}
+  <ul class="timeline">
+    {% for s in salary_history %}
+    <li>
+      <div class="fw-600">{{ '{:,.2f}'.format(s.monthly_salary) }} / month
+        {% if loop.first %}<span class="badge badge-green" style="margin-left:.3rem;">current</span>{% endif %}
+      </div>
+      <div class="timeline-meta">
+        effective {{ s.effective_from }}
+        {% if not loop.first %}→ {{ salary_history[loop.index0 - 1].effective_from }}{% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-muted text-sm">No salary recorded yet.</p>
+  {% endif %}
+</div>
+
+<!-- Trend charts -->
+<div class="chart-grid">
+  <div class="chart-card">
+    <h3>Salary over time</h3>
+    {% if salary_chart|length > 1 %}
+    <div class="chart-box"><canvas id="emp-salary"></canvas></div>
+    {% else %}<div class="chart-empty">Needs at least two salary entries</div>{% endif %}
+  </div>
+  <div class="chart-card">
+    <h3>Reviews over time</h3>
+    {% if reviews_chart %}
+    <div class="chart-box"><canvas id="emp-reviews"></canvas></div>
+    {% else %}<div class="chart-empty">No reviews yet</div>{% endif %}
+  </div>
+</div>
+
+<!-- Reviews -->
+<div class="card">
+  <div class="d-flex align-center justify-between mb-2">
+    <span class="card-title" style="margin-bottom:0;">Reviews</span>
+    <a href="/reviews/new?employee_id={{ emp.id }}" class="btn btn-outline btn-sm">+ Add Review</a>
+  </div>
+
+  {% if reviews %}
+  <ul class="timeline">
+    {% for r in reviews %}
+    <li>
+      <div class="d-flex align-center gap-1 flex-wrap">
+        <span class="badge {{ 'badge-green' if r.type.value == 'appreciation' else 'badge-red' }}">
+          {{ r.type.value.title() }}
+        </span>
+        <span class="text-sm">by <a href="/employees/{{ r.reviewer_id }}">{{ r.reviewer.name }}</a></span>
+      </div>
+      <div class="timeline-meta">{{ r.date }}</div>
+      <div class="text-sm mt-1">{{ r.notes }}</div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="empty-state" style="padding:1.5rem;">
+    <span class="empty-icon">📋</span>
+    <p>No reviews yet for {{ emp.name }}.</p>
+    <a href="/reviews/new?employee_id={{ emp.id }}" class="btn btn-outline btn-sm">Log a review</a>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', path='charts.js') }}"></script>
+<script>
+(function () {
+  if (!window.Charts || !Charts.ok) return;
+  var C = Charts.colors;
+  var pick = function (arr, k) { return arr.map(function (r) { return r[k]; }); };
+
+  var sal = {{ salary_chart | tojson }};
+  if (sal.length > 1) {
+    Charts.line("emp-salary", {
+      labels: pick(sal, "date"),
+      datasets: [{ label: "Monthly salary", data: pick(sal, "salary"), color: C.primary }],
+      step: true, money: true, legend: false, beginAtZero: false
+    });
+  }
+
+  var rv = {{ reviews_chart | tojson }};
+  if (rv.length) {
+    Charts.bar("emp-reviews", {
+      labels: pick(rv, "month"),
+      datasets: [
+        { label: "Appreciation", data: pick(rv, "appreciation"), color: C.success },
+        { label: "Escalation", data: pick(rv, "escalation"), color: C.danger }
+      ],
+      stacked: true
+    });
+  }
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ team.name if team else "New Team" }}{% endblock %}
+{% block content %}
+<div style="margin-bottom:1.25rem;">
+  <a href="/teams" style="color:var(--muted); font-size:.875rem;">← Back to teams</a>
+</div>
+<h1 style="font-size:1.3rem; font-weight:700; margin-bottom:1.5rem;">
+  {{ "Edit — " + team.name if team else "New Team" }}
+</h1>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+<div class="card" style="max-width:480px;">
+  <form method="post" action="{{ ('/teams/' + team.id|string + '/edit') if team else '/teams/new' }}">
+    <div class="form-group">
+      <label for="name">Team Name *</label>
+      <input id="name" name="name" type="text" class="form-control"
+             value="{{ team.name if team else '' }}" required />
+    </div>
+    <div class="form-group">
+      <label for="team_lead_id">Team Lead</label>
+      <select id="team_lead_id" name="team_lead_id" class="form-control">
+        <option value="">— None —</option>
+        {% for e in employees %}
+        <option value="{{ e.id }}"
+          {% if team and team.team_lead_id == e.id %}selected{% endif %}>
+          {{ e.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="display:flex; gap:.75rem; margin-top:1.25rem;">
+      <button type="submit" class="btn btn-primary">{{ "Save" if team else "Create Team" }}</button>
+      <a href="{{ '/teams/' + team.id|string if team else '/teams' }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

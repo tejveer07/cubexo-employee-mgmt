@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /></head>
+<body style="margin:0; padding:0; background:#f4f5f7;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7; padding:24px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="520" cellpadding="0" cellspacing="0"
+               style="background:#ffffff; border-radius:8px; overflow:hidden; font-family:Segoe UI, Arial, sans-serif; color:#1f2430;">
+          <tr>
+            <td style="background:#1f2430; color:#ffffff; padding:16px 28px; font-size:16px; font-weight:600;">
+              CubexO Operations
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px;">
+              <p style="margin:0 0 16px; font-size:15px;">Hi {{ employee_name }},</p>
+              <p style="margin:0 0 16px; font-size:15px; line-height:1.5;">
+                You have been assigned to the project
+                <strong>{{ project_name }}</strong> ({{ client }}).
+              </p>
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px; font-size:14px;">
+                <tr>
+                  <td style="padding:4px 16px 4px 0; color:#6b7280;">Role</td>
+                  <td style="padding:4px 0;">{{ role }}</td>
+                </tr>
+                <tr>
+                  <td style="padding:4px 16px 4px 0; color:#6b7280;">Start date</td>
+                  <td style="padding:4px 0;">{{ from_date }}</td>
+                </tr>
+              </table>
+              <p style="margin:0; font-size:14px; color:#6b7280; line-height:1.5;">
+                If you have any questions about this assignment, please reach out to your team lead.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 28px; border-top:1px solid #e5e7eb; font-size:12px; color:#9ca3af;">
+              This is an automated message from {{ from_name }}.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

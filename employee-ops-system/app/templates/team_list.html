@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Teams{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>Teams</h1>
+  <a href="/teams/new" class="btn btn-primary">+ New Team</a>
+</div>
+
+<div class="table-wrap">
+  {% if teams %}
+  <table>
+    <thead>
+      <tr>
+        <th>Team Name</th>
+        <th>Team Lead</th>
+        <th>Current Members</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in teams %}
+      <tr>
+        <td>
+          <a href="/teams/{{ t.id }}" style="font-weight:600; color:var(--text);">{{ t.name }}</a>
+        </td>
+        <td>
+          {% if t.team_lead %}
+          <a href="/employees/{{ t.team_lead_id }}" class="text-sm">{{ t.team_lead.name }}</a>
+          {% else %}<span class="text-muted text-sm">—</span>{% endif %}
+        </td>
+        <td>
+          <span class="badge badge-blue">
+            {{ t.memberships | selectattr("to_date", "none") | list | length }}
+          </span>
+        </td>
+        <td>
+          <a href="/teams/{{ t.id }}/edit" class="btn btn-outline btn-xs">Edit</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">
+    <span class="empty-icon">🏷</span>
+    <p>No teams created yet.</p>
+    <a href="/teams/new" class="btn btn-primary btn-sm">Create first team</a>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

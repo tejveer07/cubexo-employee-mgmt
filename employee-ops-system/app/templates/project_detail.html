@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }}{% endblock %}
+{% block content %}
+
+<div class="breadcrumb"><a href="/projects">Projects</a> / {{ project.name }}</div>
+
+<div class="page-header">
+  <div>
+    <h1>{{ project.name }}</h1>
+    <div class="d-flex align-center gap-1 mt-1 flex-wrap">
+      <span class="text-sm text-muted">{{ project.client }}</span>
+      <span class="text-muted">·</span>
+      <span class="badge
+        {% if project.status.value == 'active' %}badge-green
+        {% elif project.status.value == 'on_hold' %}badge-yellow
+        {% else %}badge-gray{% endif %}">
+        {{ project.status.value.replace('_',' ').title() }}
+      </span>
+      <span class="text-muted text-sm">{{ project.start_date }} → {{ project.end_date or "ongoing" }}</span>
+    </div>
+  </div>
+  <a href="/projects/{{ project.id }}/edit" class="btn btn-outline btn-sm">✏ Edit Project</a>
+</div>
+
+<div class="table-wrap">
+  <div style="padding:.65rem .9rem; background:var(--bg); border-bottom:1px solid var(--border);">
+    <span class="card-title" style="margin:0;">Assigned Employees</span>
+  </div>
+  {% if assignments %}
+  <table>
+    <thead>
+      <tr>
+        <th>Employee</th>
+        <th>Designation</th>
+        <th>Role on Project</th>
+        <th>From</th>
+        <th>To</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in assignments %}
+      <tr>
+        <td>
+          <a href="/employees/{{ a.employee_id }}" style="font-weight:600;">{{ a.employee.name }}</a>
+        </td>
+        <td class="text-sm text-muted">{{ a.employee.designation }}</td>
+        <td><span class="badge badge-purple">{{ a.role_on_project }}</span></td>
+        <td class="text-sm text-muted">{{ a.from_date }}</td>
+        <td class="text-sm text-muted">{{ a.to_date or "—" }}</td>
+        <td>
+          {% if not a.to_date %}
+          <span class="badge badge-green">Active</span>
+          {% else %}
+          <span class="badge badge-gray">Ended</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">
+    <span class="empty-icon">👥</span>
+    <p>No employees assigned to this project yet.</p>
+    <p class="text-sm text-muted">Assign from an <a href="/employees">employee's profile</a>.</p>
+  </div>
+  {% endif %}
+</div>
+
+<div class="card mt-2">
+  <div class="d-flex align-center justify-between mb-2">
+    <span class="card-title" style="margin-bottom:0;">Income History</span>
+    <button class="btn btn-outline btn-xs"
+            onclick="document.getElementById('income-change-form').style.display='block';this.style.display='none'">
+      + Record Income Change
+    </button>
+  </div>
+
+  <div id="income-change-form" style="display:none; background:var(--bg); padding:.75rem;
+       border-radius:var(--radius-sm); margin-bottom:.75rem; border:1px solid var(--border);">
+    <form method="post" action="/projects/{{ project.id }}/update-income">
+      <div class="d-flex gap-1 flex-wrap align-center">
+        <div>
+          <label class="text-xs text-muted">Monthly Income</label>
+          <input type="number" step="0.01" min="0" name="monthly_income" class="form-control" required />
+        </div>
+        <div>
+          <label class="text-xs text-muted">Effective From</label>
+          <input type="date" name="effective_from" value="{{ today }}" class="form-control" required />
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm" style="align-self:flex-end;">Save</button>
+        <button type="button" class="btn btn-ghost btn-sm" style="align-self:flex-end;"
+                onclick="this.closest('#income-change-form').style.display='none'">Cancel</button>
+      </div>
+    </form>
+    <p class="text-xs text-muted mt-1">
+      A change here only affects months from the effective date forward — past Lifetime figures are unaffected.
+      Submitting the same date again overwrites that date's rate.
+    </p>
+  </div>
+
+  {% if income_history %}
+  <ul class="timeline">
+    {% for i in income_history %}
+    <li>
+      <div class="fw-600">{{ '{:,.2f}'.format(i.monthly_income) }} / month
+        {% if loop.first %}<span class="badge badge-green" style="margin-left:.3rem;">current</span>{% endif %}
+      </div>
+      <div class="timeline-meta">
+        effective {{ i.effective_from }}
+        {% if not loop.first %}→ {{ income_history[loop.index0 - 1].effective_from }}{% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="text-muted text-sm">No income recorded yet.</p>
+  {% endif %}
+</div>
+
+<div class="card mt-2">
+  <div class="card-title">Cost Analysis</div>
+
+  <div class="text-xs text-muted mb-2">
+    GST: {% if project.gst_applicable %}applicable, currently {{ current_gst_rate }}%{% else %}exempt{% endif %}
+    &nbsp;·&nbsp; TDS: {{ project.tds_rate if project.tds_rate is not none else 0 }}%
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <span class="stat-value">{{ '{:,.2f}'.format(cost_snapshot.gross_income) }}</span>
+      <span class="stat-label">This Month Gross Income</span>
+    </div>
+    <div class="stat-card stat-muted">
+      <span class="stat-value">{{ '{:,.2f}'.format(cost_snapshot.gst_amount) }}</span>
+      <span class="stat-label">This Month GST</span>
+    </div>
+    <div class="stat-card stat-muted">
+      <span class="stat-value">{{ '{:,.2f}'.format(cost_snapshot.tds_amount) }}</span>
+      <span class="stat-label">This Month TDS</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-value">{{ '{:,.2f}'.format(cost_snapshot.net_income) }}</span>
+      <span class="stat-label">This Month Net Income</span>
+    </div>
+    <div class="stat-card stat-muted">
+      <span class="stat-value">{{ '{:,.2f}'.format(cost_snapshot.cost) }}</span>
+      <span class="stat-label">This Month Salary Cost</span>
+    </div>
+    <div class="stat-card {{ 'stat-success' if cost_snapshot.profit >= 0 else 'stat-danger' }}">
+      <span class="stat-value">{{ '{:,.2f}'.format(cost_snapshot.profit) }}</span>
+      <span class="stat-label">This Month Profit/Loss</span>
+    </div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card">
+      <span class="stat-value">{{ '{:,.2f}'.format(cost_lifetime.gross_income_to_date) }}</span>
+      <span class="stat-label">Lifetime Gross Income</span>
+    </div>
+    <div class="stat-card stat-muted">
+      <span class="stat-value">{{ '{:,.2f}'.format(cost_lifetime.gst_amount_to_date) }}</span>
+      <span class="stat-label">Lifetime GST</span>
+    </div>
+    <div class="stat-card stat-muted">
+      <span class="stat-value">{{ '{:,.2f}'.format(cost_lifetime.tds_amount_to_date) }}</span>
+      <span class="stat-label">Lifetime TDS</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-value">{{ '{:,.2f}'.format(cost_lifetime.net_income_to_date) }}</span>
+      <span class="stat-label">Lifetime Net Income</span>
+    </div>
+    <div class="stat-card stat-muted">
+      <span class="stat-value">{{ '{:,.2f}'.format(cost_lifetime.cost_to_date) }}</span>
+      <span class="stat-label">Lifetime Salary Cost</span>
+    </div>
+    <div class="stat-card {{ 'stat-success' if cost_lifetime.profit_to_date >= 0 else 'stat-danger' }}">
+      <span class="stat-value">{{ '{:,.2f}'.format(cost_lifetime.profit_to_date) }}</span>
+      <span class="stat-label">Lifetime Gross Margin</span>
+    </div>
+  </div>
+
+  {% if cost_snapshot.unset_employee_count > 0 or not income_history %}
+  <div class="alert alert-warn">
+    ⚠ {% if not income_history %}This project has no income recorded.{% endif %}
+    {% if cost_snapshot.unset_employee_count > 0 %}{{ cost_snapshot.unset_employee_count }} assigned employee(s) have no salary recorded.{% endif %}
+    Figures above are understated until these are filled in.
+  </div>
+  {% endif %}
+</div>
+
+<div class="chart-grid">
+  <div class="chart-card chart-wide">
+    <h3>Monthly net income, salary cost &amp; profit</h3>
+    {% if project_charts.monthly_pl %}
+    <div class="chart-box"><canvas id="pd-pl"></canvas></div>
+    {% else %}<div class="chart-empty">No data yet</div>{% endif %}
+  </div>
+  <div class="chart-card">
+    <h3>Income rate over time</h3>
+    {% if project_charts.income_series|length > 1 %}
+    <div class="chart-box"><canvas id="pd-income"></canvas></div>
+    {% else %}<div class="chart-empty">Needs at least two income entries</div>{% endif %}
+  </div>
+  <div class="chart-card">
+    <h3>Assigned headcount over time</h3>
+    {% if project_charts.headcount_series %}
+    <div class="chart-box"><canvas id="pd-headcount"></canvas></div>
+    {% else %}<div class="chart-empty">No data yet</div>{% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', path='charts.js') }}"></script>
+<script>
+(function () {
+  if (!window.Charts || !Charts.ok) return;
+  var D = {{ project_charts | tojson }};
+  var C = Charts.colors;
+  var pick = function (arr, k) { return arr.map(function (r) { return r[k]; }); };
+
+  var pl = D.monthly_pl || [];
+  if (pl.length) {
+    Charts.line("pd-pl", {
+      labels: pick(pl, "month"),
+      datasets: [
+        { label: "Net income", data: pick(pl, "net_income"), color: C.info },
+        { label: "Salary cost", data: pick(pl, "cost"), color: C.warn },
+        { label: "Profit / loss", data: pick(pl, "profit"), color: C.primary }
+      ],
+      money: true, beginAtZero: false
+    });
+  }
+
+  var inc = D.income_series || [];
+  if (inc.length > 1) {
+    Charts.line("pd-income", {
+      labels: pick(inc, "date"),
+      datasets: [{ label: "Monthly income", data: pick(inc, "income"), color: C.success }],
+      step: true, money: true, legend: false, beginAtZero: false
+    });
+  }
+
+  var hc = D.headcount_series || [];
+  if (hc.length) {
+    Charts.line("pd-headcount", {
+      labels: pick(hc, "month"),
+      datasets: [{ label: "Headcount", data: pick(hc, "headcount"), color: C.primary }],
+      fill: true, legend: false
+    });
+  }
+})();
+</script>
+{% endblock %}

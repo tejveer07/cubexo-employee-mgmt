@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Employees{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <h1>Employees</h1>
+  <a href="/employees/new" class="btn btn-primary">+ New Employee</a>
+</div>
+
+<!-- Filter bar -->
+<form method="get" action="/employees" class="filter-bar">
+  <div>
+    <label>Search name</label>
+    <input type="text" name="q" value="{{ filters.q }}"
+           placeholder="e.g. Rajesh…" class="form-control" style="width:180px;" />
+  </div>
+  <div>
+    <label>Status</label>
+    <select name="status" class="form-control" style="width:120px;">
+      <option value="active"   {% if filters.status == 'active'   %}selected{% endif %}>Active</option>
+      <option value="inactive" {% if filters.status == 'inactive' %}selected{% endif %}>Inactive</option>
+      <option value=""         {% if not filters.status           %}selected{% endif %}>All</option>
+    </select>
+  </div>
+  <div>
+    <label>Team</label>
+    <select name="team_id" class="form-control" style="width:150px;">
+      <option value="">All teams</option>
+      {% for t in teams %}
+      <option value="{{ t.id }}" {% if filters.team_id == t.id %}selected{% endif %}>{{ t.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label>Project</label>
+    <select name="project_id" class="form-control" style="width:150px;">
+      <option value="">All projects</option>
+      {% for p in projects %}
+      <option value="{{ p.id }}" {% if filters.project_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label>Tech Stack</label>
+    <select name="tech_id" class="form-control" style="width:150px;">
+      <option value="">Any tech</option>
+      {% for ts in tech_stacks %}
+      <option value="{{ ts.id }}" {% if filters.tech_id == ts.id %}selected{% endif %}>{{ ts.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div style="align-self:flex-end; display:flex; gap:.4rem;">
+    <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+    <a href="/employees" class="btn btn-ghost btn-sm">Clear</a>
+  </div>
+</form>
+
+<!-- Table -->
+<div class="table-wrap">
+  {% if employees %}
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Code</th>
+        <th>Designation</th>
+        <th>Team Lead</th>
+        <th>Joined</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in employees %}
+      <tr>
+        <td>
+          <a href="/employees/{{ e.id }}" style="font-weight:600; color:var(--text);">
+            {{ e.name }}
+          </a>
+        </td>
+        <td><span class="mono text-muted">{{ e.employee_code }}</span></td>
+        <td>{{ e.designation }}</td>
+        <td>
+          {% if e.team_lead %}
+          <a href="/employees/{{ e.team_lead_id }}" class="text-muted text-sm">{{ e.team_lead.name }}</a>
+          {% else %}
+          <span class="text-muted text-sm">—</span>
+          {% endif %}
+        </td>
+        <td class="text-muted text-sm">{{ e.join_date }}</td>
+        <td>
+          <span class="badge {{ 'badge-green' if e.status.value == 'active' else 'badge-gray' }}">
+            {{ e.status.value.title() }}
+          </span>
+        </td>
+        <td>
+          <a href="/employees/{{ e.id }}/edit" class="btn btn-outline btn-xs">Edit</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">
+    <span class="empty-icon">👥</span>
+    <p>No employees match your filters.</p>
+    <a href="/employees" class="btn btn-outline btn-sm">Clear filters</a>
+    &nbsp;
+    <a href="/employees/new" class="btn btn-primary btn-sm">Add Employee</a>
+  </div>
+  {% endif %}
+</div>
+
+<p class="text-xs text-muted">{{ employees|length }} employee(s) shown</p>
+
+{% endblock %}

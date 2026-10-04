@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Database Management{% endblock %}
+{% block content %}
+<h1 style="font-size:1.4rem; font-weight:700; margin-bottom:1.5rem;">Database Management</h1>
+
+{% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+{% if success %}<div class="alert alert-success">{{ success }}</div>{% endif %}
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; max-width:800px;">
+
+  <!-- Export -->
+  <div class="card">
+    <h2 style="font-size:1rem; font-weight:600; margin-bottom:.5rem;">Export Database</h2>
+    <p style="color:var(--muted); font-size:.875rem; margin-bottom:1rem;">
+      Download a timestamped copy of the current SQLite database file as a backup.
+    </p>
+    <a href="/db/export" class="btn btn-primary">Download .db File</a>
+  </div>
+
+  <!-- Import -->
+  <div class="card">
+    <h2 style="font-size:1rem; font-weight:600; margin-bottom:.5rem;">Import Database</h2>
+    <p style="color:var(--muted); font-size:.875rem; margin-bottom:.75rem;">
+      Upload a <code>.db</code> file to replace the current database.
+      The current database will be automatically backed up before the swap.
+    </p>
+    <div class="alert" style="background:#fef9c3; border:1px solid #fde047; color:#713f12; font-size:.8rem; margin-bottom:.75rem;">
+      <strong>Warning:</strong> This replaces ALL current data with the imported file.
+      A backup is created automatically but double-check before proceeding.
+    </div>
+    <form method="post" action="/db/import" enctype="multipart/form-data"
+          onsubmit="return confirm('Are you sure? This will replace ALL current data with the uploaded database.')">
+      <div class="form-group">
+        <input type="file" name="file" accept=".db" class="form-control" required />
+      </div>
+      <button type="submit" class="btn btn-danger">Import & Replace</button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}
