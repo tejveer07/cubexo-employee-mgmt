@@ -20,6 +20,9 @@
     {% if error %}
     <div class="alert alert-error">{{ error }}</div>
     {% endif %}
+    {% if success %}
+    <div class="alert alert-success">{{ success }}</div>
+    {% endif %}
 
     <form method="post" action="/login">
       <div class="form-group">
@@ -36,6 +39,9 @@
         Sign in
       </button>
     </form>
+    <p style="text-align:center;margin-top:1rem;font-size:.9rem">
+      <a href="/forgot-password">Forgot password?</a>
+    </p>
   </div>
 </body>
 </html>

@@ -118,6 +118,9 @@ it gets wiped between runs.
   bcrypt 4.0.1 is the last version that works with passlib 1.7.4 without patching.
 - Session via Starlette `SessionMiddleware` (itsdangerous signed cookie).
 - `require_login` FastAPI dependency — use on every protected route.
+- **Forgot password** (`/forgot-password`, `main.py`): username + new password, **no
+  verification by design** (local single-admin app). Anyone who can reach `/login` can
+  reset the admin password — do not expose the port on an untrusted network.
 
 ### History Preservation
 `TeamMembership` and `EmployeeProjectAssignment` rows are **never hard-deleted**.  
@@ -314,7 +317,6 @@ FastAPI matches routes in registration order. Always define literal routes first
 
 ## Known Limitations / Future Work
 
-- No password change UI yet (Phase 11 Polish).
 - No pagination on employee list (low priority for small orgs).
 - PyInstaller build not yet tested on a clean Windows machine (Phase 10 — pending real test).
 - HTMX CDN loaded from internet — for fully offline deploy, bundle htmx.min.js in `static/`.

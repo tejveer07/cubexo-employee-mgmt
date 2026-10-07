@@ -28,7 +28,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.database import engine, DB_PATH, get_db, SessionLocal
 from app import models
-from app.auth import authenticate, login_user, logout_user, require_login, LoginRequired
+from app.auth import authenticate, hash_password, login_user, logout_user, require_login, LoginRequired
 from app.templates_config import templates, BASE_DIR
 from app.services.employees import sweep_exited_employees
 from app.services.bootstrap import ensure_defaults
@@ -129,7 +129,50 @@ app.include_router(settings.router)
 async def login_page(request: Request):
     if request.session.get("user"):
         return RedirectResponse("/", status_code=302)
-    return templates.TemplateResponse("login.html", {"request": request, "error": None})
+    success = "Password updated. Please sign in." if request.query_params.get("reset") else None
+    return templates.TemplateResponse(
+        "login.html", {"request": request, "error": None, "success": success}
+    )
+
+
+@app.get("/forgot-password", response_class=HTMLResponse)
+async def forgot_password_page(request: Request):
+    return templates.TemplateResponse("forgot_password.html", {"request": request, "error": None})
+
+
+@app.post("/forgot-password", response_class=HTMLResponse)
+async def forgot_password_submit(
+    request: Request,
+    username: str = Form(...),
+    new_password: str = Form(...),
+    confirm_password: str = Form(...),
+):
+    # NOTE: intentionally unauthenticated (local single-admin app). See CLAUDE.md > Auth.
+    from app import models
+    from app.database import SessionLocal
+
+    error = None
+    if new_password != confirm_password:
+        error = "Passwords do not match."
+    elif len(new_password) < 6:
+        error = "Password must be at least 6 characters."
+    else:
+        db = SessionLocal()
+        try:
+            admin = db.query(models.AdminUser).filter_by(username=username.strip()).first()
+            if admin:
+                admin.password_hash = hash_password(new_password)
+                db.commit()
+            else:
+                error = "Unknown username."
+        finally:
+            db.close()
+
+    if error:
+        return templates.TemplateResponse(
+            "forgot_password.html", {"request": request, "error": error}, status_code=400
+        )
+    return RedirectResponse("/login?reset=1", status_code=302)
 
 
 @app.post("/login", response_class=HTMLResponse)
