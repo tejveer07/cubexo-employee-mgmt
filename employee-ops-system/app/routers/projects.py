@@ -1,10 +1,11 @@
 """
-routers/projects.py — Project CRUD: list, create, edit, status change, view assignments.
+routers/projects.py — Project CRUD: list, create, edit, status change,
+                      view/add/end assignments from the project page.
 """
 
 from datetime import date
 from decimal import Decimal
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -13,6 +14,7 @@ from app import models
 from app.auth import require_login
 from app.templates_config import templates
 from app.services import cost_analysis, analytics
+from app.services.notifications import load_smtp_config, notify_project_assignment
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -167,4 +169,76 @@ async def update_income(
     db: Session = Depends(get_db),
 ):
     cost_analysis.record_income_change(db, project_id, monthly_income, effective_from)
+    return RedirectResponse(f"/projects/{project_id}", status_code=302)
+
+
+# ---------------------------------------------------------------------------
+# Employee assignments (add / end) directly from the project page
+# ---------------------------------------------------------------------------
+
+@router.post("/{project_id}/assign-employee")
+async def assign_employee_to_project(
+    project_id: int,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    employee_id: int = Form(...),
+    role_on_project: str = Form(...),
+    from_date: date = Form(...),
+    user: str = Depends(require_login),
+    db: Session = Depends(get_db),
+):
+    project = db.query(models.Project).filter_by(id=project_id).first()
+    if not project:
+        return RedirectResponse("/projects", status_code=302)
+
+    emp = db.get(models.Employee, employee_id)
+    if not emp:
+        request.session["_flash_error"] = "Employee not found."
+        return RedirectResponse(f"/projects/{project_id}", status_code=302)
+
+    # Business rule: one project at a time — close any open assignment for this employee.
+    db.query(models.EmployeeProjectAssignment).filter_by(
+        employee_id=employee_id, to_date=None
+    ).update({"to_date": from_date})
+
+    db.add(models.EmployeeProjectAssignment(
+        employee_id=employee_id,
+        project_id=project_id,
+        role_on_project=role_on_project,
+        from_date=from_date,
+    ))
+    db.commit()
+
+    # Best-effort assignment email — same as employee-side assign flow.
+    cfg = load_smtp_config(db)
+    if cfg.enabled:
+        if emp.email and "@" in emp.email:
+            background_tasks.add_task(
+                notify_project_assignment, cfg, emp.email, emp.name,
+                project.name, project.client, role_on_project, from_date,
+            )
+            request.session["_flash_success"] = f"Assigned. Notification sent to {emp.email}."
+        else:
+            request.session["_flash_error"] = (
+                f"Assigned — {emp.name} has no valid email, so no notification was sent."
+            )
+
+    return RedirectResponse(f"/projects/{project_id}", status_code=302)
+
+
+@router.post("/{project_id}/end-assignment/{assignment_id}")
+async def end_project_assignment(
+    project_id: int,
+    assignment_id: int,
+    to_date: date = Form(...),
+    user: str = Depends(require_login),
+    db: Session = Depends(get_db),
+):
+    """End an active employee assignment directly from the project detail page."""
+    a = db.query(models.EmployeeProjectAssignment).filter_by(
+        id=assignment_id, project_id=project_id
+    ).first()
+    if a and not a.to_date:
+        a.to_date = to_date
+        db.commit()
     return RedirectResponse(f"/projects/{project_id}", status_code=302)

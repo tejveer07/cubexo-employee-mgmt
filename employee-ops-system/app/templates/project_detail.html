@@ -20,12 +20,55 @@
     </div>
   </div>
   <a href="/projects/{{ project.id }}/edit" class="btn btn-outline btn-sm">✏ Edit Project</a>
+  {% if project.status.value == 'active' %}
+  <button class="btn btn-outline btn-sm"
+          onclick="document.getElementById('add-employee-form').style.display='block';this.style.display='none'">
+    + Add Employee
+  </button>
+  {% endif %}
 </div>
 
 <div class="table-wrap">
   <div style="padding:.65rem .9rem; background:var(--bg); border-bottom:1px solid var(--border);">
     <span class="card-title" style="margin:0;">Assigned Employees</span>
   </div>
+
+  <!-- Inline add-employee form (collapsed by default) -->
+  <div id="add-employee-form" style="display:none; padding:.75rem; border-bottom:1px solid var(--border); background:var(--bg);">
+    <form method="post" action="/projects/{{ project.id }}/assign-employee">
+      <div class="d-flex gap-1 flex-wrap align-center">
+        <div>
+          <label class="text-xs text-muted">Employee</label>
+          {% if active_employees %}
+          <select name="employee_id" class="form-control" required>
+            {% for e in active_employees %}
+            <option value="{{ e.id }}">{{ e.name }} — {{ e.designation }}</option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <select class="form-control" disabled><option>No active employees</option></select>
+          {% endif %}
+        </div>
+        <div>
+          <label class="text-xs text-muted">Role on Project</label>
+          <input type="text" name="role_on_project" placeholder="e.g. Backend Dev"
+                 class="form-control" required style="width:160px;" />
+        </div>
+        <div>
+          <label class="text-xs text-muted">From Date</label>
+          <input type="date" name="from_date" value="{{ today }}" class="form-control" required />
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm" style="align-self:flex-end;"
+                {% if not active_employees %}disabled{% endif %}>Save</button>
+        <button type="button" class="btn btn-ghost btn-sm" style="align-self:flex-end;"
+                onclick="document.getElementById('add-employee-form').style.display='none';
+                         document.querySelectorAll('.btn-outline').forEach(function(b){if(b.textContent.trim()==='+ Add Employee')b.style.display='';})">
+          Cancel
+        </button>
+      </div>
+    </form>
+  </div>
+
   {% if assignments %}
   <table>
     <thead>
@@ -36,6 +79,7 @@
         <th>From</th>
         <th>To</th>
         <th>Status</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
@@ -55,6 +99,15 @@
           <span class="badge badge-gray">Ended</span>
           {% endif %}
         </td>
+        <td>
+          {% if not a.to_date %}
+          <form method="post" action="/projects/{{ project.id }}/end-assignment/{{ a.id }}"
+                onsubmit="return confirm('End {{ a.employee.name }}\'s assignment on this project?')">
+            <input type="hidden" name="to_date" value="{{ today }}" />
+            <button type="submit" class="btn btn-outline btn-xs">End</button>
+          </form>
+          {% endif %}
+        </td>
       </tr>
       {% endfor %}
     </tbody>
@@ -63,7 +116,7 @@
   <div class="empty-state">
     <span class="empty-icon">👥</span>
     <p>No employees assigned to this project yet.</p>
-    <p class="text-sm text-muted">Assign from an <a href="/employees">employee's profile</a>.</p>
+    <p class="text-sm text-muted">Use the <strong>+ Add Employee</strong> button above, or assign from an <a href="/employees">employee's profile</a>.</p>
   </div>
   {% endif %}
 </div>

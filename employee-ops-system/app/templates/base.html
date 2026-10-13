@@ -16,7 +16,7 @@
 {% if request.session.get("user") %}
 <nav class="topbar">
   <div class="container">
-    <a href="/" class="brand">⚙ CubexO Ops</a>
+    <a href="/" class="brand">⚙ Dashboard</a>
     {% set path = request.url.path %}
     <a href="/employees" class="nav-link {{ 'active' if path.startswith('/employees') else '' }}">Employees</a>
     <a href="/teams"     class="nav-link {{ 'active' if path.startswith('/teams')     else '' }}">Teams</a>
